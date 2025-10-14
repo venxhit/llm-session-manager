@@ -55,6 +55,7 @@ poetry.lock
 
 # Test outputs
 test_export.json
+test_exports/
 quick.json
 context.json
 backup.json
