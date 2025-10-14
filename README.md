@@ -176,10 +176,10 @@ Run the automated test suite:
 Or test individual components:
 
 ```bash
-python test_discovery.py        # Test session discovery
-python test_token_estimator.py  # Test token estimation
-python test_health_monitor.py   # Test health scoring
-python test_dashboard.py        # Test dashboard rendering
+python manual_tests/test_discovery.py        # Test session discovery
+python manual_tests/test_token_estimator.py  # Test token estimation
+python manual_tests/test_health_monitor.py   # Test health scoring
+python manual_tests/test_dashboard.py        # Test dashboard rendering
 ```
 
 See `TESTING_GUIDE.md` for comprehensive testing instructions.

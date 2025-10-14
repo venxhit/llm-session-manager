@@ -144,7 +144,7 @@ EOF
 Test process discovery with your existing test script.
 
 ```bash
-python test_discovery.py
+python manual_tests/test_discovery.py
 ```
 
 **Expected Result:**
@@ -177,7 +177,7 @@ Session 1:
 Test token counting and file scanning.
 
 ```bash
-python test_token_estimator.py
+python manual_tests/test_token_estimator.py
 ```
 
 **Expected Result:**
@@ -218,7 +218,7 @@ Token Usage:
 Test health scoring system.
 
 ```bash
-python test_health_monitor.py
+python manual_tests/test_health_monitor.py
 ```
 
 **Expected Result:**
@@ -255,7 +255,7 @@ Session: Critical Session
 Test dashboard rendering without live mode.
 
 ```bash
-python test_dashboard.py
+python manual_tests/test_dashboard.py
 ```
 
 **Expected Result:**

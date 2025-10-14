@@ -5,7 +5,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 
 # Add project root to path
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from llm_session_manager.core.health_monitor import HealthMonitor
 from llm_session_manager.models import Session, SessionType, SessionStatus

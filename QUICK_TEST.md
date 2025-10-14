@@ -53,16 +53,16 @@ Test each component individually:
 
 ```bash
 # Test 1: Session Discovery
-python test_discovery.py
+python manual_tests/test_discovery.py
 
 # Test 2: Token Estimation
-python test_token_estimator.py
+python manual_tests/test_token_estimator.py
 
 # Test 3: Health Monitoring
-python test_health_monitor.py
+python manual_tests/test_health_monitor.py
 
 # Test 4: Dashboard
-python test_dashboard.py
+python manual_tests/test_dashboard.py
 ```
 
 ---
@@ -104,10 +104,10 @@ cd /Users/gagan/llm-session-manager
 
 | Test | What It Checks | Time |
 |------|----------------|------|
-| `test_discovery.py` | Finds running sessions via psutil | 5s |
-| `test_token_estimator.py` | Counts tokens in files | 10s |
-| `test_health_monitor.py` | Calculates health scores | 5s |
-| `test_dashboard.py` | Renders TUI dashboard | 10s |
+| `manual_tests/test_discovery.py` | Finds running sessions via psutil | 5s |
+| `manual_tests/test_token_estimator.py` | Counts tokens in files | 10s |
+| `manual_tests/test_health_monitor.py` | Calculates health scores | 5s |
+| `manual_tests/test_dashboard.py` | Renders TUI dashboard | 10s |
 | `cli list` | End-to-end CLI workflow | 5s |
 | `cli export` | JSON serialization | 5s |
 | `cli import` | JSON deserialization | 2s |
