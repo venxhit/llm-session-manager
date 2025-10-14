@@ -3,7 +3,7 @@ name = "llm-session-manager"
 version = "0.1.0"
 description = "CLI tool for managing multiple parallel LLM coding sessions"
 authors = [
-    {name = "Your Name",email = "your.email@example.com"}
+    {name = "Gagandeep Singh", email = "gagan.2492@gmail.com"}
 ]
 readme = "README.md"
 requires-python = ">=3.10,<4.0"
@@ -17,6 +17,7 @@ dependencies = [
     "chromadb>=0.4.0",
     "sqlalchemy>=2.0.0",
     "python-dateutil>=2.8.0",
+    "tiktoken>=0.5.0",
 ]
 
 [project.optional-dependencies]

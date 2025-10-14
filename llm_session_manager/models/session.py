@@ -11,6 +11,7 @@ class SessionType(str, Enum):
     """Type of LLM coding session."""
     CLAUDE_CODE = "claude_code"
     CURSOR_CLI = "cursor_cli"
+    GITHUB_COPILOT = "github_copilot"
     UNKNOWN = "unknown"
 
 

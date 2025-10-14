@@ -28,6 +28,7 @@ class TokenEstimator:
         "claude_max5": 35000,
         "claude_max20": 140000,
         "cursor_default": 10000,
+        "github_copilot": 8000,  # GitHub Copilot typical context window
     }
 
     # File extensions to process

@@ -21,6 +21,7 @@ class SessionDiscovery:
     PROCESS_PATTERNS = {
         "claude": SessionType.CLAUDE_CODE,
         "cursor": SessionType.CURSOR_CLI,
+        "copilot": SessionType.GITHUB_COPILOT,
     }
 
     def discover_sessions(self) -> List[Session]:
@@ -106,6 +107,17 @@ class SessionDiscovery:
             # Look for "cursor" in process name or command line
             if 'cursor' in proc_name or 'cursor' in cmdline_str:
                 return SessionType.CURSOR_CLI
+
+            # Check for GitHub Copilot
+            # Look for "copilot" in process name or command line
+            if 'copilot' in proc_name or 'copilot' in cmdline_str:
+                # Also check for VS Code extensions running copilot
+                if 'github.copilot' in cmdline_str or 'copilot-agent' in cmdline_str:
+                    return SessionType.GITHUB_COPILOT
+                # Node process running Copilot
+                if 'node' in proc_name and 'copilot' in cmdline_str:
+                    return SessionType.GITHUB_COPILOT
+                return SessionType.GITHUB_COPILOT
 
             return SessionType.UNKNOWN
 

@@ -4,11 +4,11 @@
 
 > Prevent token limit surprises. Detect context rot. Maximize AI assistant ROI.
 
-A terminal-native tool for engineering teams running 5-10+ parallel Claude Code or Cursor sessions. Get real-time visibility into session health, token usage, and context degradation — all from your command line.
+A terminal-native tool for engineering teams running 5-10+ parallel AI coding sessions (Claude Code, Cursor, GitHub Copilot). Get real-time visibility into session health, token usage, and context degradation — all from your command line.
 
 ## Features
 
-- 🔍 **Session Discovery** - Automatically finds running Claude Code and Cursor sessions
+- 🔍 **Session Discovery** - Automatically finds running Claude Code, Cursor, and GitHub Copilot sessions
 - 📊 **Real-time Dashboard** - Live TUI with auto-refresh
 - 🪙 **Token Tracking** - Estimates token usage by scanning project files
 - ❤️ **Health Monitoring** - Multi-factor health scoring (tokens, duration, activity, errors)
@@ -177,7 +177,7 @@ mypy .
 
 - Python 3.10+
 - Poetry (for dependency management)
-- Active Claude Code or Cursor session to monitor
+- Active Claude Code, Cursor, or GitHub Copilot session to monitor
 
 ## Project Status
 
