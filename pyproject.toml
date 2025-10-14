@@ -1,6 +1,6 @@
 [project]
 name = "llm-session-manager"
-version = "0.1.0"
+version = "0.2.0"
 description = "CLI tool for managing multiple parallel LLM coding sessions"
 authors = [
     {name = "Gagandeep Singh", email = "gagan.2492@gmail.com"}
