@@ -16,6 +16,7 @@ from .core.health_monitor import HealthMonitor
 from .core.memory_manager import MemoryManager
 from .utils.token_estimator import TokenEstimator
 from .utils.recommendations import RecommendationEngine
+from .utils.auto_tagger import AutoTagger
 from .storage.database import Database
 from .ui.dashboard import Dashboard
 from .models import Session
@@ -675,6 +676,136 @@ def set_project(
 
 
 @app.command()
+def auto_tag(
+    session_id: str = typer.Argument(..., help="Session ID to auto-tag"),
+    apply: bool = typer.Option(False, "--apply", "-a", help="Apply tags automatically without confirmation")
+):
+    """Suggest tags for a session based on file content analysis.
+
+    Analyzes file extensions, imports, keywords, and directory structure
+    to suggest relevant tags.
+
+    Example:
+        llm-session auto-tag abc123          # Show suggestions
+        llm-session auto-tag abc123 --apply  # Auto-apply tags
+    """
+    try:
+        # Initialize components
+        db, discovery, health_monitor, token_estimator = get_components()
+        auto_tagger = AutoTagger()
+
+        # Discover sessions
+        console.print(f"[dim]Searching for session: {session_id}...[/dim]")
+        sessions = discovery.discover_sessions()
+
+        # Find matching session
+        session = None
+        for s in sessions:
+            if s.id == session_id or s.id.startswith(session_id):
+                session = s
+                break
+
+        if not session:
+            console.print(f"[red]Session '{session_id}' not found.[/red]")
+            raise typer.Exit(code=1)
+
+        # Analyze and suggest tags
+        console.print(f"[dim]Analyzing session content...[/dim]\n")
+        suggested_tags = auto_tagger.suggest_tags(session, max_tags=10)
+
+        if not suggested_tags:
+            console.print("[yellow]No tags suggested. Session may not have a working directory or analyzable files.[/yellow]")
+            return
+
+        # Show suggestions
+        console.print(f"[bold cyan]Suggested tags for session {session.id[:20]}...[/bold cyan]\n")
+
+        # Separate existing vs new tags
+        existing_tags = set(session.tags)
+        new_tags = [t for t in suggested_tags if t not in existing_tags]
+        already_tagged = [t for t in suggested_tags if t in existing_tags]
+
+        if new_tags:
+            console.print("[bold]New tag suggestions:[/bold]")
+            for i, tag in enumerate(new_tags, 1):
+                console.print(f"  {i}. [magenta]#{tag}[/magenta]")
+        else:
+            console.print("[green]Session already has all suggested tags![/green]")
+
+        if already_tagged:
+            console.print(f"\n[dim]Already tagged: {', '.join(f'#{t}' for t in already_tagged)}[/dim]")
+
+        if not new_tags:
+            return
+
+        # Apply tags if requested or confirmed
+        if apply:
+            should_apply = True
+        else:
+            console.print()
+            should_apply = typer.confirm("Apply these tags?", default=True)
+
+        if should_apply:
+            for tag in new_tags:
+                session.add_tag(tag)
+            db.update_session(session)
+
+            console.print(f"\n[green]✓[/green] Applied {len(new_tags)} tags to session")
+            console.print(f"  All tags: {', '.join(f'#{t}' for t in session.tags)}")
+        else:
+            console.print("[dim]Tags not applied.[/dim]")
+
+    except Exception as e:
+        console.print(f"[red]Error auto-tagging: {e}[/red]")
+        logger.error("auto_tag_failed", error=str(e))
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def describe(
+    session_id: str = typer.Argument(..., help="Session ID to describe"),
+    description: str = typer.Argument(..., help="Session description")
+):
+    """Add or update a session description.
+
+    Example:
+        llm-session describe abc123 "Working on authentication feature for the API"
+    """
+    try:
+        # Initialize components
+        db, discovery, health_monitor, token_estimator = get_components()
+
+        # Discover sessions
+        console.print(f"[dim]Searching for session: {session_id}...[/dim]")
+        sessions = discovery.discover_sessions()
+
+        # Find matching session
+        session = None
+        for s in sessions:
+            if s.id == session_id or s.id.startswith(session_id):
+                session = s
+                break
+
+        if not session:
+            console.print(f"[red]Session '{session_id}' not found.[/red]")
+            raise typer.Exit(code=1)
+
+        # Set description
+        session.description = description
+
+        # Save to database
+        db.update_session(session)
+
+        console.print(f"[green]✓[/green] Description updated for session {session.id[:20]}...")
+        console.print(f"  Description: {description}")
+
+    except Exception as e:
+        console.print(f"[red]Error setting description: {e}[/red]")
+        logger.error("describe_failed", error=str(e))
+        raise typer.Exit(code=1)
+
+
+@app.command()
 def init_config():
     """Initialize configuration file with defaults.
 
@@ -758,6 +889,182 @@ def show_config():
     except Exception as e:
         console.print(f"[red]Error reading config: {e}[/red]")
         logger.error("config_read_failed", error=str(e))
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def batch_tag(
+    session_pattern: str = typer.Argument(..., help="Pattern to match sessions (e.g., 'abc*' or 'all')"),
+    tags: List[str] = typer.Argument(..., help="Tags to add to all matching sessions")
+):
+    """Add tags to multiple sessions at once.
+
+    Use 'all' to tag all sessions, or a pattern like 'abc*' to match specific ones.
+
+    Example:
+        llm-session batch-tag all backend api
+        llm-session batch-tag "test-*" testing experimental
+    """
+    try:
+        # Initialize components
+        db, discovery, health_monitor, token_estimator = get_components()
+
+        # Discover sessions
+        console.print("[dim]Discovering sessions...[/dim]")
+        all_sessions = discovery.discover_sessions()
+
+        # Filter sessions by pattern
+        if session_pattern == "all":
+            sessions = all_sessions
+        else:
+            # Simple pattern matching (prefix match)
+            pattern = session_pattern.replace("*", "")
+            sessions = [s for s in all_sessions if s.id.startswith(pattern)]
+
+        if not sessions:
+            console.print(f"[yellow]No sessions match pattern '{session_pattern}'[/yellow]")
+            return
+
+        # Confirm operation
+        console.print(f"\n[yellow]About to tag {len(sessions)} sessions with: {', '.join(f'#{t}' for t in tags)}[/yellow]")
+        confirm = typer.confirm("Continue?", default=True)
+        if not confirm:
+            console.print("[dim]Cancelled.[/dim]")
+            return
+
+        # Tag all sessions
+        for session in sessions:
+            for tag in tags:
+                session.add_tag(tag)
+            db.update_session(session)
+
+        console.print(f"\n[green]✓[/green] Tagged {len(sessions)} sessions")
+        for session in sessions[:5]:  # Show first 5
+            console.print(f"  • {session.id[:30]}... → {', '.join(f'#{t}' for t in session.tags)}")
+        if len(sessions) > 5:
+            console.print(f"  ... and {len(sessions) - 5} more")
+
+    except Exception as e:
+        console.print(f"[red]Error batch tagging: {e}[/red]")
+        logger.error("batch_tag_failed", error=str(e))
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def batch_export(
+    session_pattern: str = typer.Argument(..., help="Pattern to match sessions"),
+    output_dir: str = typer.Option("exports", "--output-dir", "-o", help="Output directory"),
+    format: str = typer.Option("json", "--format", "-f", help="Export format: json, yaml, or markdown")
+):
+    """Export multiple sessions at once.
+
+    Example:
+        llm-session batch-export all --output-dir ./exports --format json
+        llm-session batch-export "project-*" --format markdown
+    """
+    try:
+        from pathlib import Path
+
+        # Initialize components
+        db, discovery, health_monitor, token_estimator = get_components()
+
+        # Discover sessions
+        console.print("[dim]Discovering sessions...[/dim]")
+        all_sessions = discovery.discover_sessions()
+
+        # Filter sessions
+        if session_pattern == "all":
+            sessions = all_sessions
+        else:
+            pattern = session_pattern.replace("*", "")
+            sessions = [s for s in all_sessions if s.id.startswith(pattern)]
+
+        if not sessions:
+            console.print(f"[yellow]No sessions match pattern '{session_pattern}'[/yellow]")
+            return
+
+        # Create output directory
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+
+        # Confirm
+        console.print(f"\n[yellow]About to export {len(sessions)} sessions to {output_path}[/yellow]")
+        confirm = typer.confirm("Continue?", default=True)
+        if not confirm:
+            console.print("[dim]Cancelled.[/dim]")
+            return
+
+        # Update metrics
+        token_estimator.update_token_counts(sessions)
+        health_monitor.update_health_scores(sessions)
+
+        # Export each session
+        for session in sessions:
+            # Determine filename
+            filename = f"{session.id[:20]}.{format}"
+            file_path = output_path / filename
+
+            # Create export data
+            from datetime import datetime as dt
+            export_data = {
+                "session_id": session.id,
+                "timestamp": dt.now().isoformat(),
+                "type": session.type.value,
+                "project_name": session.project_name,
+                "description": session.description,
+                "tags": session.tags,
+                "context": {
+                    "pid": session.pid,
+                    "status": session.status.value,
+                    "start_time": session.start_time.isoformat(),
+                    "last_activity": session.last_activity.isoformat(),
+                    "working_directory": session.working_directory,
+                    "token_count": session.token_count,
+                    "token_limit": session.token_limit,
+                    "health_score": session.health_score,
+                    "message_count": session.message_count,
+                    "file_count": session.file_count,
+                    "error_count": session.error_count,
+                }
+            }
+
+            # Write based on format
+            if format == "yaml":
+                import yaml
+                with open(file_path, 'w') as f:
+                    yaml.dump(export_data, f, default_flow_style=False)
+            elif format == "markdown":
+                duration = dt.now() - session.start_time
+                hours = int(duration.total_seconds() // 3600)
+                minutes = int((duration.total_seconds() % 3600) // 60)
+
+                md_content = f"""# Session Report: {session.id}
+
+## Overview
+- **Type**: {session.type.value}
+- **Status**: {session.status.value}
+- **Project**: {session.project_name or 'N/A'}
+- **Tags**: {', '.join(f'`{t}`' for t in session.tags) if session.tags else 'None'}
+
+## Metrics
+- **Token Usage**: {session.token_count:,} / {session.token_limit:,} ({session.token_count/session.token_limit*100:.1f}%)
+- **Health Score**: {session.health_score:.1f}%
+- **Duration**: {hours}h {minutes}m
+
+## Description
+{session.description or 'No description'}
+"""
+                with open(file_path, 'w') as f:
+                    f.write(md_content)
+            else:  # json
+                with open(file_path, 'w') as f:
+                    json.dump(export_data, f, indent=2)
+
+        console.print(f"\n[green]✓[/green] Exported {len(sessions)} sessions to {output_path}/")
+
+    except Exception as e:
+        console.print(f"[red]Error batch exporting: {e}[/red]")
+        logger.error("batch_export_failed", error=str(e))
         raise typer.Exit(code=1)
 
 
@@ -1047,9 +1354,12 @@ def info():
     console.print("[bold]Commands:[/bold]")
     console.print("  monitor       - Start the real-time dashboard")
     console.print("  list          - List all active sessions")
-    console.print("  tag           - Add tags to a session")
-    console.print("  untag         - Remove tags from a session")
+    console.print("  tag / untag   - Add/remove tags from a session")
+    console.print("  auto-tag      - AI-powered automatic tagging")
+    console.print("  describe      - Add description to a session")
     console.print("  set-project   - Set project name for a session")
+    console.print("  batch-tag     - Tag multiple sessions at once")
+    console.print("  batch-export  - Export multiple sessions at once")
     console.print("  export        - Export session context (JSON/YAML/Markdown)")
     console.print("  import-context- Import session context")
     console.print("  health        - Show health details")
