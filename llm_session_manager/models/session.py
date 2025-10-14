@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from enum import Enum
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from uuid import uuid4
 
 
@@ -53,6 +53,11 @@ class Session:
     message_count: int = 0
     file_count: int = 0
     error_count: int = 0
+
+    # Organization
+    tags: List[str] = field(default_factory=list)
+    project_name: Optional[str] = None
+    description: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert session to JSON-serializable dictionary.
@@ -120,3 +125,42 @@ class Session:
             True if health score is above threshold.
         """
         return self.health_score >= threshold
+
+    def add_tag(self, tag: str) -> None:
+        """Add a tag to the session.
+
+        Args:
+            tag: Tag to add (will be lowercased and stripped).
+        """
+        tag = tag.lower().strip()
+        if tag and tag not in self.tags:
+            self.tags.append(tag)
+
+    def remove_tag(self, tag: str) -> None:
+        """Remove a tag from the session.
+
+        Args:
+            tag: Tag to remove.
+        """
+        tag = tag.lower().strip()
+        if tag in self.tags:
+            self.tags.remove(tag)
+
+    def has_tag(self, tag: str) -> bool:
+        """Check if session has a specific tag.
+
+        Args:
+            tag: Tag to check for.
+
+        Returns:
+            True if session has the tag.
+        """
+        return tag.lower().strip() in self.tags
+
+    def set_project(self, project_name: str) -> None:
+        """Set the project name for this session.
+
+        Args:
+            project_name: Name of the project.
+        """
+        self.project_name = project_name.strip() if project_name else None

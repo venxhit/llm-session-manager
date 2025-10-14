@@ -10,9 +10,12 @@ A terminal-native tool for engineering teams running 5-10+ parallel AI coding se
 
 - 🔍 **Session Discovery** - Automatically finds running Claude Code, Cursor, and GitHub Copilot sessions
 - 📊 **Real-time Dashboard** - Live TUI with auto-refresh
-- 🪙 **Token Tracking** - Estimates token usage by scanning project files
+- 🪙 **Token Tracking** - Precise token counting with tiktoken (no more estimates!)
 - ❤️ **Health Monitoring** - Multi-factor health scoring (tokens, duration, activity, errors)
-- 💾 **Context Export/Import** - Save and restore session contexts
+- 💾 **Context Export/Import** - Save and restore sessions in JSON, YAML, or Markdown
+- 🏷️ **Session Tagging** - Organize sessions with tags and project names
+- ⚙️ **YAML Configuration** - Customize token limits, health weights, and thresholds
+- 🤖 **Smart Recommendations** - AI-powered suggestions for session management
 - 🎨 **Rich CLI** - Beautiful terminal output with colors and emojis
 
 ## Installation
@@ -69,13 +72,26 @@ List all active LLM sessions.
 python -m llm_session_manager.cli list                    # Table format
 python -m llm_session_manager.cli list --format json      # JSON format
 python -m llm_session_manager.cli list --status active    # Filter by status
+python -m llm_session_manager.cli list --tag backend      # Filter by tag
+python -m llm_session_manager.cli list --project "My App" # Filter by project
+```
+
+### `tag / untag / set-project`
+Organize sessions with tags and project names.
+
+```bash
+python -m llm_session_manager.cli tag <session-id> backend api feature-xyz
+python -m llm_session_manager.cli untag <session-id> old-tag
+python -m llm_session_manager.cli set-project <session-id> "My Web App"
 ```
 
 ### `export`
-Export session context to JSON file.
+Export session context to JSON, YAML, or Markdown.
 
 ```bash
 python -m llm_session_manager.cli export <session-id> --output context.json
+python -m llm_session_manager.cli export <session-id> --output report.md --format markdown
+python -m llm_session_manager.cli export <session-id> --output data.yaml --format yaml
 ```
 
 ### `import-context`
@@ -92,6 +108,33 @@ Show detailed health breakdown for a session.
 ```bash
 python -m llm_session_manager.cli health <session-id>
 ```
+
+### `recommend`
+Get smart recommendations for session management.
+
+```bash
+python -m llm_session_manager.cli recommend
+```
+
+Provides intelligent suggestions for:
+- Restarting unhealthy sessions
+- Closing idle sessions
+- Merging similar sessions
+- Token usage warnings
+
+### `init-config / show-config`
+Manage YAML configuration.
+
+```bash
+python -m llm_session_manager.cli init-config   # Create default config
+python -m llm_session_manager.cli show-config   # View current config
+```
+
+Edit `~/.config/llm-session-manager/config.yaml` to customize:
+- Token limits for different AI assistants
+- Health score weights
+- Warning/critical thresholds
+- Dashboard preferences
 
 ## Testing
 

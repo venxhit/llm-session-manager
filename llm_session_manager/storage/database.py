@@ -78,6 +78,9 @@ class Database:
                     message_count INTEGER DEFAULT 0,
                     file_count INTEGER DEFAULT 0,
                     error_count INTEGER DEFAULT 0,
+                    tags TEXT DEFAULT '[]',
+                    project_name TEXT,
+                    description TEXT,
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP
                 )
             """)
@@ -145,8 +148,8 @@ class Database:
                 INSERT INTO sessions (
                     id, pid, type, status, start_time, last_activity,
                     working_directory, token_count, token_limit, health_score,
-                    message_count, file_count, error_count
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    message_count, file_count, error_count, tags, project_name, description
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 session.id,
                 session.pid,
@@ -161,6 +164,9 @@ class Database:
                 session.message_count,
                 session.file_count,
                 session.error_count,
+                json.dumps(session.tags),
+                session.project_name,
+                session.description,
             ))
             logger.info("session_added", session_id=session.id, pid=session.pid)
 
@@ -188,7 +194,10 @@ class Database:
                     health_score = ?,
                     message_count = ?,
                     file_count = ?,
-                    error_count = ?
+                    error_count = ?,
+                    tags = ?,
+                    project_name = ?,
+                    description = ?
                 WHERE id = ?
             """, (
                 session.pid,
@@ -203,6 +212,9 @@ class Database:
                 session.message_count,
                 session.file_count,
                 session.error_count,
+                json.dumps(session.tags),
+                session.project_name,
+                session.description,
                 session.id,
             ))
             logger.info("session_updated", session_id=session.id)
@@ -395,6 +407,9 @@ class Database:
         Returns:
             Session object.
         """
+        # Deserialize tags from JSON
+        tags = json.loads(row["tags"]) if row["tags"] else []
+
         return Session(
             id=row["id"],
             pid=row["pid"],
@@ -409,6 +424,9 @@ class Database:
             message_count=row["message_count"],
             file_count=row["file_count"],
             error_count=row["error_count"],
+            tags=tags,
+            project_name=row.get("project_name"),
+            description=row.get("description"),
         )
 
     def _row_to_memory(self, row: sqlite3.Row) -> Memory:

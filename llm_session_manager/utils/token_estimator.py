@@ -5,6 +5,12 @@ from pathlib import Path
 from typing import Dict, List, Set, Optional
 import structlog
 
+try:
+    import tiktoken
+    TIKTOKEN_AVAILABLE = True
+except ImportError:
+    TIKTOKEN_AVAILABLE = False
+
 from ..models import Session
 
 logger = structlog.get_logger()
@@ -64,10 +70,31 @@ class TokenEstimator:
         '.pytest_cache', '.mypy_cache', '.ruff_cache',
     }
 
-    def __init__(self):
-        """Initialize token estimator with empty cache."""
+    def __init__(self, use_tiktoken: bool = True):
+        """Initialize token estimator with empty cache.
+
+        Args:
+            use_tiktoken: If True and tiktoken is available, use precise token counting.
+                         Falls back to estimation if False or tiktoken not available.
+        """
         self._file_token_cache: Dict[str, int] = {}
         self._file_mtime_cache: Dict[str, float] = {}
+        self.use_tiktoken = use_tiktoken and TIKTOKEN_AVAILABLE
+
+        # Initialize tiktoken encoder if available
+        if self.use_tiktoken:
+            try:
+                # Use cl100k_base encoding (used by GPT-4, Claude, etc.)
+                self.encoder = tiktoken.get_encoding("cl100k_base")
+                logger.info("tiktoken_initialized", encoding="cl100k_base")
+            except Exception as e:
+                logger.warning("tiktoken_init_failed", error=str(e))
+                self.use_tiktoken = False
+                self.encoder = None
+        else:
+            self.encoder = None
+            if not TIKTOKEN_AVAILABLE:
+                logger.info("tiktoken_not_available", fallback="estimation")
 
     def estimate_session_tokens(self, session: Session) -> int:
         """Estimate total token count for a session.
@@ -143,11 +170,17 @@ class TokenEstimator:
                     # File hasn't changed, return cached value
                     return self._file_token_cache[file_path]
 
-            # Read file and estimate tokens
+            # Read file and count tokens
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     content = f.read()
-                    token_count = len(content) // self.CHARS_PER_TOKEN
+
+                    # Use tiktoken for precise counting if available
+                    if self.use_tiktoken and self.encoder:
+                        token_count = len(self.encoder.encode(content))
+                    else:
+                        # Fall back to estimation
+                        token_count = len(content) // self.CHARS_PER_TOKEN
 
                     # Update cache
                     self._file_token_cache[file_path] = token_count
@@ -291,7 +324,7 @@ class TokenEstimator:
         self._file_mtime_cache.clear()
         logger.info("token_cache_cleared")
 
-    def get_cache_stats(self) -> Dict[str, int]:
+    def get_cache_stats(self) -> Dict[str, any]:
         """Get statistics about the token cache.
 
         Returns:
@@ -300,4 +333,21 @@ class TokenEstimator:
         return {
             "cached_files": len(self._file_token_cache),
             "total_cached_tokens": sum(self._file_token_cache.values()),
+            "using_tiktoken": self.use_tiktoken,
+            "tiktoken_available": TIKTOKEN_AVAILABLE,
         }
+
+    def count_tokens(self, text: str) -> int:
+        """Count tokens in a text string.
+
+        Args:
+            text: Text to count tokens for.
+
+        Returns:
+            Number of tokens in the text.
+        """
+        if self.use_tiktoken and self.encoder:
+            return len(self.encoder.encode(text))
+        else:
+            # Fall back to estimation
+            return len(text) // self.CHARS_PER_TOKEN
