@@ -22,13 +22,15 @@ from .ui.dashboard import Dashboard
 from .models import Session
 from .config import Config
 
-# Configure logging
+# Configure logging (WARNING level by default for cleaner CLI output)
+import logging
 structlog.configure(
     processors=[
         structlog.processors.add_log_level,
         structlog.processors.TimeStamper(fmt="iso"),
         structlog.dev.ConsoleRenderer()
-    ]
+    ],
+    wrapper_class=structlog.make_filtering_bound_logger(logging.WARNING)
 )
 
 logger = structlog.get_logger()

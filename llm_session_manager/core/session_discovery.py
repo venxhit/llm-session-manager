@@ -105,8 +105,19 @@ class SessionDiscovery:
 
             # Check for Cursor CLI
             # Look for "cursor" in process name or command line
+            # BUT exclude helper processes (GPU, Renderer, Plugin, crashpad)
             if 'cursor' in proc_name or 'cursor' in cmdline_str:
-                return SessionType.CURSOR_CLI
+                # Exclude macOS system processes (TextInputUI, etc.)
+                if 'textinput' in proc_name or 'textinput' in cmdline_str:
+                    return SessionType.UNKNOWN
+                # Exclude helper/subprocess patterns
+                excluded_patterns = ['helper', 'gpu', 'renderer', 'plugin', 'crashpad', 'codex']
+                if any(pattern in proc_name for pattern in excluded_patterns):
+                    return SessionType.UNKNOWN
+                # Only match main Cursor process from /Applications/Cursor.app
+                if '/Applications/Cursor.app' in cmdline_str and proc_name == 'cursor':
+                    return SessionType.CURSOR_CLI
+                return SessionType.UNKNOWN
 
             # Check for GitHub Copilot
             # Look for "copilot" in process name or command line
