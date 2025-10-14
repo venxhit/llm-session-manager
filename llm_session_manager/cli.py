@@ -13,6 +13,7 @@ import structlog
 
 from .core.session_discovery import SessionDiscovery
 from .core.health_monitor import HealthMonitor
+from .core.memory_manager import MemoryManager
 from .utils.token_estimator import TokenEstimator
 from .utils.recommendations import RecommendationEngine
 from .storage.database import Database
@@ -761,6 +762,200 @@ def show_config():
 
 
 @app.command()
+def memory_add(
+    session_id: str = typer.Argument(..., help="Session ID to save memory from"),
+    content: str = typer.Argument(..., help="Memory content to save"),
+    tags: Optional[List[str]] = typer.Option(None, "--tag", "-t", help="Tags for categorization")
+):
+    """Save important knowledge from a session to cross-session memory.
+
+    This allows other sessions to find and use this knowledge later.
+
+    Example:
+        llm-session memory-add abc123 "Implemented JWT auth using jose library" --tag auth --tag backend
+    """
+    try:
+        memory_mgr = MemoryManager()
+
+        if not memory_mgr.is_available():
+            console.print("[red]Memory system not available. ChromaDB may not be installed.[/red]")
+            console.print("[yellow]Install with: poetry add chromadb[/yellow]")
+            raise typer.Exit(code=1)
+
+        memory_id = memory_mgr.add_memory(
+            session_id=session_id,
+            content=content,
+            tags=tags or []
+        )
+
+        console.print(f"[green]✓[/green] Memory saved!")
+        console.print(f"  Memory ID: {memory_id}")
+        console.print(f"  Session: {session_id[:30]}...")
+        console.print(f"  Content: {content[:100]}{'...' if len(content) > 100 else ''}")
+        if tags:
+            console.print(f"  Tags: {', '.join(f'#{t}' for t in tags)}")
+
+    except Exception as e:
+        console.print(f"[red]Error saving memory: {e}[/red]")
+        logger.error("memory_add_failed", error=str(e))
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def memory_search(
+    query: str = typer.Argument(..., help="What to search for"),
+    limit: int = typer.Option(5, "--limit", "-n", help="Number of results"),
+    session: Optional[str] = typer.Option(None, "--session", "-s", help="Filter by session ID")
+):
+    """Search across all session memories using semantic search.
+
+    Finds relevant knowledge from past sessions based on meaning, not just keywords.
+
+    Example:
+        llm-session memory-search "how to implement authentication"
+        llm-session memory-search "database setup" --limit 3
+    """
+    try:
+        memory_mgr = MemoryManager()
+
+        if not memory_mgr.is_available():
+            console.print("[red]Memory system not available. ChromaDB may not be installed.[/red]")
+            raise typer.Exit(code=1)
+
+        console.print(f"[dim]Searching for: {query}...[/dim]\n")
+
+        memories = memory_mgr.search_memories(
+            query=query,
+            limit=limit,
+            session_id=session
+        )
+
+        if not memories:
+            console.print("[yellow]No memories found.[/yellow]")
+            return
+
+        console.print(f"[bold cyan]Found {len(memories)} relevant memories:[/bold cyan]\n")
+
+        for i, memory in enumerate(memories, 1):
+            relevance = memory['relevance'] * 100
+            session_id = memory['metadata'].get('session_id', 'unknown')
+            timestamp = memory['metadata'].get('timestamp', 'unknown')
+
+            # Determine relevance color
+            if relevance >= 80:
+                rel_color = "green"
+            elif relevance >= 60:
+                rel_color = "yellow"
+            else:
+                rel_color = "red"
+
+            panel_text = Text()
+            panel_text.append(f"{memory['content']}\n\n", style="white")
+            panel_text.append("From: ", style="bold dim")
+            panel_text.append(f"{session_id[:30]}...\n", style="dim")
+            panel_text.append("When: ", style="bold dim")
+            panel_text.append(f"{timestamp}\n", style="dim")
+            if memory['tags']:
+                panel_text.append("Tags: ", style="bold dim")
+                panel_text.append(f"{', '.join(f'#{t}' for t in memory['tags'])}", style="magenta")
+
+            console.print(Panel(
+                panel_text,
+                title=f"Memory {i} (Relevance: [{rel_color}]{relevance:.0f}%[/{rel_color}])",
+                border_style=rel_color
+            ))
+            console.print()
+
+    except Exception as e:
+        console.print(f"[red]Error searching memories: {e}[/red]")
+        logger.error("memory_search_failed", error=str(e))
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def memory_list(
+    session_id: Optional[str] = typer.Option(None, "--session", "-s", help="Filter by session ID")
+):
+    """List all saved memories.
+
+    Example:
+        llm-session memory-list
+        llm-session memory-list --session abc123
+    """
+    try:
+        memory_mgr = MemoryManager()
+
+        if not memory_mgr.is_available():
+            console.print("[red]Memory system not available.[/red]")
+            raise typer.Exit(code=1)
+
+        if session_id:
+            memories = memory_mgr.get_memories_by_session(session_id)
+            title = f"Memories from session {session_id[:20]}..."
+        else:
+            # Get all memories (limited implementation)
+            stats = memory_mgr.get_stats()
+            console.print(f"[cyan]Total memories: {stats['total_memories']}[/cyan]")
+            console.print(f"[cyan]Sessions with memories: {stats['sessions_with_memories']}[/cyan]\n")
+
+            console.print("[dim]Tip: Use --session to filter by specific session[/dim]")
+            console.print("[dim]Tip: Use 'memory-search' to find relevant memories[/dim]")
+            return
+
+        if not memories:
+            console.print("[yellow]No memories found.[/yellow]")
+            return
+
+        console.print(f"\n[bold]{title}[/bold]")
+        console.print(f"[dim]Found {len(memories)} memories[/dim]\n")
+
+        for i, memory in enumerate(memories, 1):
+            timestamp = memory['metadata'].get('timestamp', 'unknown')
+            tags = memory['tags']
+
+            console.print(f"{i}. [bold]{memory['content'][:80]}...[/bold]")
+            console.print(f"   [dim]ID: {memory['id']}[/dim]")
+            console.print(f"   [dim]When: {timestamp}[/dim]")
+            if tags:
+                console.print(f"   [magenta]Tags: {', '.join(f'#{t}' for t in tags)}[/magenta]")
+            console.print()
+
+    except Exception as e:
+        console.print(f"[red]Error listing memories: {e}[/red]")
+        logger.error("memory_list_failed", error=str(e))
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def memory_stats():
+    """Show memory system statistics.
+
+    Example:
+        llm-session memory-stats
+    """
+    try:
+        memory_mgr = MemoryManager()
+
+        if not memory_mgr.is_available():
+            console.print("[red]Memory system not available. ChromaDB may not be installed.[/red]")
+            raise typer.Exit(code=1)
+
+        stats = memory_mgr.get_stats()
+
+        console.print("\n[bold cyan]Memory System Statistics[/bold cyan]\n")
+        console.print(f"  Total Memories:        {stats['total_memories']:,}")
+        console.print(f"  Sessions with Memories: {stats['sessions_with_memories']}")
+        console.print(f"  Storage Location:       {stats['storage_path']}")
+        console.print(f"  Status:                 [green]Active[/green]")
+        console.print()
+
+    except Exception as e:
+        console.print(f"[red]Error getting stats: {e}[/red]")
+        logger.error("memory_stats_failed", error=str(e))
+        raise typer.Exit(code=1)
+
+
+@app.command()
 def recommend():
     """Get smart recommendations for session management.
 
@@ -845,6 +1040,7 @@ def info():
     console.print("  • Health scoring")
     console.print("  • Context export/import (JSON, YAML, Markdown)")
     console.print("  • Session tagging and organization")
+    console.print("  • Cross-session memory (semantic search with ChromaDB)")
     console.print("  • Configurable via YAML")
     console.print("  • GitHub Copilot support")
     console.print()
@@ -858,6 +1054,10 @@ def info():
     console.print("  import-context- Import session context")
     console.print("  health        - Show health details")
     console.print("  recommend     - Get smart recommendations")
+    console.print("  memory-add    - Save knowledge to cross-session memory")
+    console.print("  memory-search - Search memories semantically")
+    console.print("  memory-list   - List all memories")
+    console.print("  memory-stats  - Show memory system stats")
     console.print("  init-config   - Create default configuration file")
     console.print("  show-config   - Show current configuration")
     console.print()

@@ -14,6 +14,7 @@ A terminal-native tool for engineering teams running 5-10+ parallel AI coding se
 - ❤️ **Health Monitoring** - Multi-factor health scoring (tokens, duration, activity, errors)
 - 💾 **Context Export/Import** - Save and restore sessions in JSON, YAML, or Markdown
 - 🏷️ **Session Tagging** - Organize sessions with tags and project names
+- 🧠 **Cross-Session Memory** - Semantic search across all sessions using ChromaDB (THE KILLER FEATURE!)
 - ⚙️ **YAML Configuration** - Customize token limits, health weights, and thresholds
 - 🤖 **Smart Recommendations** - AI-powered suggestions for session management
 - 🎨 **Rich CLI** - Beautiful terminal output with colors and emojis
@@ -135,6 +136,34 @@ Edit `~/.config/llm-session-manager/config.yaml` to customize:
 - Health score weights
 - Warning/critical thresholds
 - Dashboard preferences
+
+### `memory-add / memory-search / memory-list / memory-stats`
+Cross-session memory with semantic search (🔥 KILLER FEATURE!)
+
+Save knowledge from one session and find it in another using AI-powered semantic search.
+
+```bash
+# Save important learnings
+python -m llm_session_manager.cli memory-add <session-id> \
+  "Implemented JWT auth using jose library" \
+  --tag auth --tag backend
+
+# Search across ALL sessions semantically
+python -m llm_session_manager.cli memory-search "how to do authentication"
+
+# List memories
+python -m llm_session_manager.cli memory-list --session <session-id>
+
+# View stats
+python -m llm_session_manager.cli memory-stats
+```
+
+**How it works:**
+- Memories are embedded using ChromaDB's semantic search
+- Searches understand meaning, not just keywords
+- Example: Searching "auth" will find "JWT authentication" and "login system"
+- Knowledge persists across all sessions
+- No more re-explaining context when switching sessions!
 
 ## Testing
 
