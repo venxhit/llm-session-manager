@@ -1,0 +1,36 @@
+[project]
+name = "llm-session-manager"
+version = "0.1.0"
+description = "CLI tool for managing multiple parallel LLM coding sessions"
+authors = [
+    {name = "Your Name",email = "your.email@example.com"}
+]
+readme = "README.md"
+requires-python = ">=3.10,<4.0"
+dependencies = [
+    "typer>=0.9.0",
+    "textual>=0.40.0",
+    "rich>=13.0.0",
+    "psutil>=5.9.0",
+    "pyyaml>=6.0",
+    "structlog>=23.0.0",
+    "chromadb>=0.4.0",
+    "sqlalchemy>=2.0.0",
+    "python-dateutil>=2.8.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+
+[project.scripts]
+llm-session = "llm_session_manager.cli:app"
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
