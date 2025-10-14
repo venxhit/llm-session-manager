@@ -166,9 +166,9 @@ ModuleNotFoundError: No module named 'llm_session_manager'
 ## 📞 Need More Help?
 
 For detailed testing instructions, see:
-- **TESTING_GUIDE.md** - Complete step-by-step guide (20 tests)
-- **CLI_GUIDE.md** - All CLI commands with examples
-- **DASHBOARD_FEATURES.md** - Dashboard features and usage
+- [TESTING_GUIDE.md](TESTING_GUIDE.md) - Complete step-by-step guide (20 tests)
+- [CLI_GUIDE.md](CLI_GUIDE.md) - All CLI commands with examples
+- [DASHBOARD_FEATURES.md](DASHBOARD_FEATURES.md) - Dashboard features and usage
 
 ---
 

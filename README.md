@@ -182,7 +182,7 @@ python manual_tests/test_health_monitor.py   # Test health scoring
 python manual_tests/test_dashboard.py        # Test dashboard rendering
 ```
 
-See `TESTING_GUIDE.md` for comprehensive testing instructions.
+See [docs/TESTING_GUIDE.md](docs/TESTING_GUIDE.md) for comprehensive testing instructions.
 
 ## Architecture
 
@@ -240,10 +240,10 @@ mypy .
 
 ## Documentation
 
-- `QUICK_TEST.md` - 5-minute testing guide
-- `TESTING_GUIDE.md` - Comprehensive testing instructions
-- `CLI_GUIDE.md` - Complete CLI reference
-- `DASHBOARD_FEATURES.md` - Dashboard features and usage
+- [docs/QUICK_TEST.md](docs/QUICK_TEST.md) - 5-minute testing guide
+- [docs/TESTING_GUIDE.md](docs/TESTING_GUIDE.md) - Comprehensive testing instructions
+- [docs/CLI_GUIDE.md](docs/CLI_GUIDE.md) - Complete CLI reference
+- [docs/DASHBOARD_FEATURES.md](docs/DASHBOARD_FEATURES.md) - Dashboard features and usage
 
 ## Requirements
 
@@ -335,7 +335,7 @@ Interested? See `PILOT_OUTREACH.md` or contact us at [your email].
 
 ## Contributing
 
-Contributions welcome! Please read `TESTING_GUIDE.md` before submitting PRs.
+Contributions welcome! Please read [docs/TESTING_GUIDE.md](docs/TESTING_GUIDE.md) before submitting PRs.
 
 **Priority areas:**
 - GitHub Copilot support

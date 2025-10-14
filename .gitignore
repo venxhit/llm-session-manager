@@ -64,3 +64,14 @@ backup.json
 *.tmp
 *.bak
 .cache/
+
+# Development notes (keep locally, not in repo)
+SESSION_SUMMARY.md
+FEATURES_COMPLETED.md
+UPGRADE_ROADMAP.md
+VIRAL_STRATEGY.md
+DOCS_FOR_NOTION.md
+TESTING_SUMMARY.md
+WHATS_NEW_*.md
+*_NOTES.md
+*_SUMMARY.md
