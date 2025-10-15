@@ -1,0 +1,269 @@
+# AI Coding Assistant Detection Registry
+# Community-maintained registry of AI coding tools and their process patterns
+# Version: 1.0.0
+
+ai_coding_assistants:
+
+  # Claude Code (Anthropic)
+  claude_code:
+    display_name: "Claude Code"
+    description: "Anthropic's Claude AI coding assistant"
+    patterns:
+      process_names:
+        - "claude"
+        - "Claude"
+        - "node"  # Claude Code runs as Node process
+      cmdline_keywords:
+        - "claude-code"
+        - "claude_code"
+        - "@anthropic/claude"
+      paths:
+        macos:
+          - "/Applications/Claude.app"
+          - "~/Library/Application Support/Claude"
+        windows:
+          - "C:\\Program Files\\Claude"
+          - "%LOCALAPPDATA%\\Programs\\Claude"
+        linux:
+          - "/opt/claude"
+          - "/usr/local/bin/claude"
+          - "~/.local/share/claude"
+    exclude_patterns:
+      - "helper"
+      - "crashpad"
+      - "gpu"
+      - "renderer"
+    token_limits:
+      default: 200000
+      pro: 200000
+      max: 1400000
+
+  # Cursor IDE
+  cursor:
+    display_name: "Cursor"
+    description: "AI-first code editor built on VS Code"
+    patterns:
+      process_names:
+        - "cursor"
+        - "Cursor"
+      cmdline_keywords:
+        - "cursor-ide"
+        - "/Applications/Cursor.app"
+      paths:
+        macos:
+          - "/Applications/Cursor.app"
+        windows:
+          - "C:\\Users\\*\\AppData\\Local\\Programs\\cursor"
+          - "%LOCALAPPDATA%\\Programs\\cursor"
+        linux:
+          - "/opt/cursor"
+          - "~/.local/share/cursor"
+    exclude_patterns:
+      - "helper"
+      - "gpu"
+      - "renderer"
+      - "plugin"
+      - "crashpad"
+      - "codex"
+      - "textinput"  # macOS system process false positive
+    token_limits:
+      default: 100000
+
+  # GitHub Copilot
+  github_copilot:
+    display_name: "GitHub Copilot"
+    description: "GitHub's AI pair programmer"
+    patterns:
+      process_names:
+        - "copilot"
+        - "copilot-agent"
+        - "node"
+      cmdline_keywords:
+        - "github.copilot"
+        - "copilot-agent"
+        - "copilot.vim"
+      paths:
+        macos:
+          - "~/.vscode/extensions/github.copilot"
+          - "~/Library/Application Support/Code/extensions/github.copilot"
+        windows:
+          - "%USERPROFILE%\\.vscode\\extensions\\github.copilot"
+        linux:
+          - "~/.vscode/extensions/github.copilot"
+    token_limits:
+      default: 8000
+
+  # Windsurf (Codeium)
+  windsurf:
+    display_name: "Windsurf"
+    description: "Codeium's agentic IDE"
+    patterns:
+      process_names:
+        - "windsurf"
+        - "Windsurf"
+      cmdline_keywords:
+        - "windsurf"
+        - "codeium-windsurf"
+      paths:
+        macos:
+          - "/Applications/Windsurf.app"
+        windows:
+          - "C:\\Users\\*\\AppData\\Local\\Programs\\windsurf"
+        linux:
+          - "/opt/windsurf"
+    exclude_patterns:
+      - "helper"
+      - "gpu"
+      - "renderer"
+    token_limits:
+      default: 100000
+
+  # Aider
+  aider:
+    display_name: "Aider"
+    description: "AI pair programming in your terminal"
+    patterns:
+      process_names:
+        - "aider"
+        - "python"  # Aider runs as Python script
+      cmdline_keywords:
+        - "aider"
+        - "aider.chat"
+        - "aider.main"
+      paths:
+        macos:
+          - "/usr/local/bin/aider"
+          - "~/.local/bin/aider"
+        windows:
+          - "%USERPROFILE%\\AppData\\Local\\Programs\\Python\\*\\Scripts\\aider.exe"
+        linux:
+          - "/usr/local/bin/aider"
+          - "~/.local/bin/aider"
+    token_limits:
+      default: 200000  # Depends on model used
+
+  # Codeium
+  codeium:
+    display_name: "Codeium"
+    description: "Free AI code completion"
+    patterns:
+      process_names:
+        - "codeium"
+        - "codeium-lsp"
+      cmdline_keywords:
+        - "codeium"
+        - "codeium-lsp"
+      paths:
+        macos:
+          - "~/.codeium"
+        windows:
+          - "%USERPROFILE%\\.codeium"
+        linux:
+          - "~/.codeium"
+    token_limits:
+      default: 50000
+
+  # Continue.dev
+  continue:
+    display_name: "Continue"
+    description: "Open-source AI code assistant"
+    patterns:
+      process_names:
+        - "continue"
+        - "node"
+      cmdline_keywords:
+        - "continue"
+        - "@continuedev"
+      paths:
+        macos:
+          - "~/.continue"
+        windows:
+          - "%USERPROFILE%\\.continue"
+        linux:
+          - "~/.continue"
+    token_limits:
+      default: 200000
+
+  # Tabnine
+  tabnine:
+    display_name: "Tabnine"
+    description: "AI code completion"
+    patterns:
+      process_names:
+        - "tabnine"
+        - "TabNine"
+      cmdline_keywords:
+        - "tabnine"
+        - "TabNine"
+      paths:
+        macos:
+          - "~/.tabnine"
+        windows:
+          - "%USERPROFILE%\\.tabnine"
+        linux:
+          - "~/.tabnine"
+    token_limits:
+      default: 50000
+
+# Heuristic patterns for unknown tools
+heuristics:
+  # Common AI coding tool indicators
+  ai_keywords:
+    - "ai"
+    - "llm"
+    - "gpt"
+    - "claude"
+    - "copilot"
+    - "assistant"
+    - "chat"
+    - "completion"
+
+  # Technology stack indicators
+  tech_indicators:
+    - "electron"      # Many AI IDEs use Electron
+    - "node"          # Node.js-based tools
+    - "language-server"  # LSP-based assistants
+    - "lsp"
+
+  # Behavior indicators
+  behavior_patterns:
+    min_memory_mb: 50     # AI tools typically use >50MB
+    has_network: true      # AI tools make API calls
+    has_websocket: true    # Real-time communication
+
+  # Exclude common false positives
+  exclude_system_processes:
+    - "system"
+    - "kernel"
+    - "daemon"
+    - "service"
+    - "textinput"
+    - "spotlight"
+
+# Configuration
+config:
+  # Update registry from remote source
+  auto_update: true
+  update_interval_hours: 24
+  remote_registry_url: "https://raw.githubusercontent.com/iamgagan/llm-session-manager/main/llm_session_manager/config/ai_tools_registry.yaml"
+
+  # Detection strategy
+  detection_strategy: "hybrid"  # registry, heuristic, llm, hybrid
+
+  # LLM fallback settings
+  llm_fallback:
+    enabled: false  # Opt-in for privacy
+    provider: "ollama"  # ollama, anthropic, openai
+    model: "llama3.2"  # Local model by default
+    confidence_threshold: 0.7
+    max_retries: 2
+
+# Metadata
+metadata:
+  version: "1.0.0"
+  last_updated: "2025-01-14"
+  contributors:
+    - "llm-session-manager team"
+  contributing:
+    url: "https://github.com/iamgagan/llm-session-manager/blob/main/CONTRIBUTING.md"
+    instructions: "Submit PR to add new AI coding tools to this registry"

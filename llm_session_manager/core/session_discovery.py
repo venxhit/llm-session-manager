@@ -6,6 +6,7 @@ from typing import List, Optional
 import structlog
 
 from ..models import Session, SessionType, SessionStatus
+from .detectors import HybridDetector
 
 logger = structlog.get_logger()
 
@@ -13,16 +14,18 @@ logger = structlog.get_logger()
 class SessionDiscovery:
     """Discovers and tracks running LLM coding assistant processes.
 
+    Uses hybrid detection system combining registry, heuristics, and optional LLM.
     Scans the system for Claude Code, Cursor CLI, and other AI assistant
     processes, creating Session objects for each discovered process.
     """
 
-    # Process name patterns to search for
-    PROCESS_PATTERNS = {
-        "claude": SessionType.CLAUDE_CODE,
-        "cursor": SessionType.CURSOR_CLI,
-        "copilot": SessionType.GITHUB_COPILOT,
-    }
+    def __init__(self, enable_llm: bool = False):
+        """Initialize session discovery.
+
+        Args:
+            enable_llm: Whether to enable LLM-based detection fallback (opt-in).
+        """
+        self.detector = HybridDetector(enable_llm=enable_llm)
 
     def discover_sessions(self) -> List[Session]:
         """Scan for running LLM assistant processes.
@@ -37,10 +40,10 @@ class SessionDiscovery:
             # Iterate through all running processes
             for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'create_time', 'cwd']):
                 try:
-                    # Check if this is an LLM assistant process
-                    session_type = self.identify_session_type(proc)
+                    # Use hybrid detector to identify session type
+                    session_type = self.detector.identify_session_type(proc)
 
-                    if session_type != SessionType.UNKNOWN:
+                    if session_type is not None and session_type != SessionType.UNKNOWN:
                         session = self._create_session_from_process(proc, session_type)
                         discovered_sessions.append(session)
                         logger.info(
@@ -76,65 +79,6 @@ class SessionDiscovery:
             sessions_found=len(discovered_sessions)
         )
         return discovered_sessions
-
-    def identify_session_type(self, process: psutil.Process) -> SessionType:
-        """Determine the type of LLM assistant from process information.
-
-        Args:
-            process: psutil.Process object to analyze.
-
-        Returns:
-            SessionType enum value (CLAUDE_CODE, CURSOR_CLI, or UNKNOWN).
-        """
-        try:
-            # Get process name and command line
-            proc_info = process.info
-            proc_name = (proc_info.get('name') or '').lower()
-            cmdline = proc_info.get('cmdline') or []
-            cmdline_str = ' '.join(cmdline).lower()
-
-            # Check for Claude Code
-            # Look for "claude" in process name or command line args
-            if 'claude' in proc_name or 'claude' in cmdline_str:
-                # Additional checks for Claude Code CLI
-                if 'claude-code' in cmdline_str or 'claude_code' in cmdline_str:
-                    return SessionType.CLAUDE_CODE
-                # Check for node process running Claude Code
-                if 'node' in proc_name and 'claude' in cmdline_str:
-                    return SessionType.CLAUDE_CODE
-
-            # Check for Cursor CLI
-            # Look for "cursor" in process name or command line
-            # BUT exclude helper processes (GPU, Renderer, Plugin, crashpad)
-            if 'cursor' in proc_name or 'cursor' in cmdline_str:
-                # Exclude macOS system processes (TextInputUI, etc.)
-                if 'textinput' in proc_name or 'textinput' in cmdline_str:
-                    return SessionType.UNKNOWN
-                # Exclude helper/subprocess patterns
-                excluded_patterns = ['helper', 'gpu', 'renderer', 'plugin', 'crashpad', 'codex']
-                if any(pattern in proc_name for pattern in excluded_patterns):
-                    return SessionType.UNKNOWN
-                # Only match main Cursor process from /Applications/Cursor.app
-                if '/Applications/Cursor.app' in cmdline_str and proc_name == 'cursor':
-                    return SessionType.CURSOR_CLI
-                return SessionType.UNKNOWN
-
-            # Check for GitHub Copilot
-            # Look for "copilot" in process name or command line
-            if 'copilot' in proc_name or 'copilot' in cmdline_str:
-                # Also check for VS Code extensions running copilot
-                if 'github.copilot' in cmdline_str or 'copilot-agent' in cmdline_str:
-                    return SessionType.GITHUB_COPILOT
-                # Node process running Copilot
-                if 'node' in proc_name and 'copilot' in cmdline_str:
-                    return SessionType.GITHUB_COPILOT
-                return SessionType.GITHUB_COPILOT
-
-            return SessionType.UNKNOWN
-
-        except Exception as e:
-            logger.debug("session_type_identification_failed", error=str(e))
-            return SessionType.UNKNOWN
 
     def get_working_directory(self, process: psutil.Process) -> str:
         """Extract working directory from process.
