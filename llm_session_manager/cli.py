@@ -680,18 +680,24 @@ def set_project(
 @app.command()
 def auto_tag(
     session_id: str = typer.Argument(..., help="Session ID to auto-tag"),
-    apply: bool = typer.Option(False, "--apply", "-a", help="Apply tags automatically without confirmation")
+    apply: bool = typer.Option(False, "--apply", "-a", help="Apply tags automatically without confirmation"),
+    use_ai: bool = typer.Option(False, "--ai", help="Use AI for intelligent tag suggestions"),
+    interactive: bool = typer.Option(False, "--interactive", "-i", help="Choose tags individually")
 ):
     """Suggest tags for a session based on file content analysis.
 
     Analyzes file extensions, imports, keywords, and directory structure
-    to suggest relevant tags.
+    to suggest relevant tags. Can use AI for more intelligent suggestions.
 
     Example:
-        llm-session auto-tag abc123          # Show suggestions
-        llm-session auto-tag abc123 --apply  # Auto-apply tags
+        llm-session auto-tag abc123                # Heuristic suggestions
+        llm-session auto-tag abc123 --ai           # AI-powered suggestions
+        llm-session auto-tag abc123 --interactive  # Choose tags individually
+        llm-session auto-tag abc123 --apply        # Auto-apply tags
     """
     try:
+        from ..utils.ai_tagger import AITagger
+
         # Initialize components
         db, discovery, health_monitor, token_estimator = get_components()
         auto_tagger = AutoTagger()
@@ -711,16 +717,34 @@ def auto_tag(
             console.print(f"[red]Session '{session_id}' not found.[/red]")
             raise typer.Exit(code=1)
 
-        # Analyze and suggest tags
-        console.print(f"[dim]Analyzing session content...[/dim]\n")
-        suggested_tags = auto_tagger.suggest_tags(session, max_tags=10)
+        # Choose tagging method
+        suggested_tags = []
+        tag_source = "heuristic"
+
+        if use_ai:
+            console.print(f"[dim]Using AI to analyze session content...[/dim]\n")
+            ai_tagger = AITagger()
+            if not ai_tagger.is_available():
+                console.print("[yellow]AI tagging not available. Set ANTHROPIC_API_KEY environment variable.[/yellow]")
+                console.print("[dim]Falling back to heuristic analysis...[/dim]\n")
+                suggested_tags = auto_tagger.suggest_tags(session, max_tags=10)
+            else:
+                suggested_tags = ai_tagger.suggest_tags_ai(session, max_tags=10)
+                tag_source = "ai"
+                if not suggested_tags:
+                    console.print("[dim]AI analysis didn't return tags. Trying heuristic analysis...[/dim]\n")
+                    suggested_tags = auto_tagger.suggest_tags(session, max_tags=10)
+                    tag_source = "heuristic"
+        else:
+            console.print(f"[dim]Analyzing session content...[/dim]\n")
+            suggested_tags = auto_tagger.suggest_tags(session, max_tags=10)
 
         if not suggested_tags:
             console.print("[yellow]No tags suggested. Session may not have a working directory or analyzable files.[/yellow]")
             return
 
         # Show suggestions
-        console.print(f"[bold cyan]Suggested tags for session {session.id[:20]}...[/bold cyan]\n")
+        console.print(f"[bold cyan]Suggested tags for session {session.id[:20]}... ({tag_source})[/bold cyan]\n")
 
         # Separate existing vs new tags
         existing_tags = set(session.tags)
@@ -740,22 +764,44 @@ def auto_tag(
         if not new_tags:
             return
 
-        # Apply tags if requested or confirmed
-        if apply:
+        # Interactive selection
+        selected_tags = new_tags
+        if interactive and not apply:
+            console.print("\n[bold]Select tags to apply:[/bold]")
+            selected_tags = []
+            for tag in new_tags:
+                if typer.confirm(f"Apply #{tag}?", default=True):
+                    selected_tags.append(tag)
+                    # Record positive feedback
+                    db.add_tag_feedback(session.id, tag, True, tag_source)
+                else:
+                    # Record negative feedback
+                    db.add_tag_feedback(session.id, tag, False, tag_source)
+        elif apply:
             should_apply = True
         else:
             console.print()
             should_apply = typer.confirm("Apply these tags?", default=True)
+            if not should_apply:
+                # Record all as rejected
+                for tag in new_tags:
+                    db.add_tag_feedback(session.id, tag, False, tag_source)
+                console.print("[dim]Tags not applied.[/dim]")
+                return
+            selected_tags = new_tags
 
-        if should_apply:
-            for tag in new_tags:
+        # Apply selected tags
+        if selected_tags:
+            for tag in selected_tags:
                 session.add_tag(tag)
+                # Record feedback if not already recorded
+                if not interactive:
+                    db.add_tag_feedback(session.id, tag, True, tag_source)
+
             db.update_session(session)
 
-            console.print(f"\n[green]✓[/green] Applied {len(new_tags)} tags to session")
+            console.print(f"\n[green]✓[/green] Applied {len(selected_tags)} tags to session")
             console.print(f"  All tags: {', '.join(f'#{t}' for t in session.tags)}")
-        else:
-            console.print("[dim]Tags not applied.[/dim]")
 
     except Exception as e:
         console.print(f"[red]Error auto-tagging: {e}[/red]")
@@ -766,14 +812,23 @@ def auto_tag(
 @app.command()
 def describe(
     session_id: str = typer.Argument(..., help="Session ID to describe"),
-    description: str = typer.Argument(..., help="Session description")
+    description: Optional[str] = typer.Argument(None, help="Session description (omit to use AI)"),
+    use_ai: bool = typer.Option(False, "--ai", help="Generate description using AI"),
+    show_only: bool = typer.Option(False, "--show", help="Show current description without editing")
 ):
     """Add or update a session description.
 
+    Can manually set a description or use AI to generate one based on
+    project content and structure.
+
     Example:
-        llm-session describe abc123 "Working on authentication feature for the API"
+        llm-session describe abc123 "Working on auth feature"  # Manual
+        llm-session describe abc123 --ai                        # AI-generated
+        llm-session describe abc123 --show                      # View current
     """
     try:
+        from ..utils.description_generator import DescriptionGenerator
+
         # Initialize components
         db, discovery, health_monitor, token_estimator = get_components()
 
@@ -792,6 +847,48 @@ def describe(
             console.print(f"[red]Session '{session_id}' not found.[/red]")
             raise typer.Exit(code=1)
 
+        # Show current description
+        if show_only:
+            if session.description:
+                console.print(f"[bold]Session {session.id[:20]}...[/bold]")
+                console.print(f"  {session.description}")
+            else:
+                console.print(f"[yellow]No description set for session {session.id[:20]}...[/yellow]")
+            return
+
+        # AI generation
+        if use_ai or description is None:
+            console.print(f"[dim]Generating AI description...[/dim]\n")
+            desc_gen = DescriptionGenerator()
+
+            if not desc_gen.is_available():
+                console.print("[yellow]AI description generation not available. Set ANTHROPIC_API_KEY environment variable.[/yellow]")
+                if description is None:
+                    console.print("[red]Please provide a description manually.[/red]")
+                    raise typer.Exit(code=1)
+            else:
+                generated = desc_gen.generate_description(session)
+                if generated:
+                    console.print(f"[bold cyan]Generated description:[/bold cyan]")
+                    console.print(f"  {generated}\n")
+
+                    if description:
+                        # User provided manual description too, ask which to use
+                        use_generated = typer.confirm("Use AI-generated description?", default=True)
+                        description = generated if use_generated else description
+                    else:
+                        # Only AI description available
+                        if typer.confirm("Use this description?", default=True):
+                            description = generated
+                        else:
+                            console.print("[dim]Description not updated.[/dim]")
+                            return
+                else:
+                    console.print("[yellow]AI description generation failed.[/yellow]")
+                    if description is None:
+                        console.print("[red]Please provide a description manually.[/red]")
+                        raise typer.Exit(code=1)
+
         # Set description
         session.description = description
 
@@ -804,6 +901,178 @@ def describe(
     except Exception as e:
         console.print(f"[red]Error setting description: {e}[/red]")
         logger.error("describe_failed", error=str(e))
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def search(
+    query: str = typer.Argument(..., help="Search query for session descriptions"),
+    show_details: bool = typer.Option(False, "--details", "-d", help="Show full session details")
+):
+    """Search sessions by description text.
+
+    Searches through all session descriptions for matching text.
+
+    Example:
+        llm-session search "authentication"
+        llm-session search "API" --details
+    """
+    try:
+        from rich.table import Table
+
+        # Initialize components
+        db, discovery, health_monitor, token_estimator = get_components()
+
+        # Search in database
+        console.print(f"[dim]Searching for: '{query}'...[/dim]\n")
+        matching_sessions = db.search_sessions_by_description(query)
+
+        if not matching_sessions:
+            console.print(f"[yellow]No sessions found matching '{query}'[/yellow]")
+            return
+
+        console.print(f"[green]Found {len(matching_sessions)} matching sessions:[/green]\n")
+
+        if show_details:
+            # Show detailed view
+            for session in matching_sessions:
+                console.print(f"[bold cyan]Session: {session.id[:30]}...[/bold cyan]")
+                console.print(f"  Type: {session.type.value}")
+                console.print(f"  Status: {session.status.value}")
+                console.print(f"  Project: {session.project_name or 'N/A'}")
+                console.print(f"  Tags: {', '.join(f'#{t}' for t in session.tags) if session.tags else 'None'}")
+                console.print(f"  Description: {session.description}")
+                console.print(f"  Working Dir: {session.working_directory}")
+                console.print()
+        else:
+            # Show table view
+            table = Table(show_header=True, header_style="bold cyan")
+            table.add_column("Session ID", style="dim", width=25)
+            table.add_column("Type", width=12)
+            table.add_column("Project", width=15)
+            table.add_column("Description", width=50)
+
+            for session in matching_sessions[:20]:  # Limit to 20 results
+                table.add_row(
+                    session.id[:25] + "..." if len(session.id) > 25 else session.id,
+                    session.type.value,
+                    (session.project_name or "")[:15],
+                    (session.description or "")[:50]
+                )
+
+            console.print(table)
+
+            if len(matching_sessions) > 20:
+                console.print(f"\n[dim]... and {len(matching_sessions) - 20} more. Use --details for full list.[/dim]")
+
+    except Exception as e:
+        console.print(f"[red]Error searching: {e}[/red]")
+        logger.error("search_failed", error=str(e))
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def batch_close(
+    session_pattern: str = typer.Argument(..., help="Pattern to match sessions (e.g., 'abc*' or 'all')"),
+    force: bool = typer.Option(False, "--force", "-f", help="Force close without confirmation"),
+    status_filter: Optional[str] = typer.Option(None, "--status", "-s", help="Filter by status (idle, active, etc.)")
+):
+    """Close multiple sessions at once.
+
+    Terminates the processes for matching sessions. Use with caution!
+
+    Example:
+        llm-session batch-close "test-*"           # Close test sessions
+        llm-session batch-close all --status idle  # Close all idle sessions
+        llm-session batch-close all --force        # Close all without asking
+    """
+    try:
+        import signal
+
+        # Initialize components
+        db, discovery, health_monitor, token_estimator = get_components()
+
+        # Discover sessions
+        console.print("[dim]Discovering sessions...[/dim]")
+        all_sessions = discovery.discover_sessions()
+
+        # Filter sessions by pattern
+        if session_pattern == "all":
+            sessions = all_sessions
+        else:
+            # Simple pattern matching (prefix match)
+            pattern = session_pattern.replace("*", "")
+            sessions = [s for s in all_sessions if s.id.startswith(pattern)]
+
+        # Filter by status if provided
+        if status_filter:
+            from ..models import SessionStatus
+            try:
+                status_enum = SessionStatus(status_filter.lower())
+                sessions = [s for s in sessions if s.status == status_enum]
+            except ValueError:
+                console.print(f"[red]Invalid status: {status_filter}[/red]")
+                console.print(f"Valid statuses: {', '.join(s.value for s in SessionStatus)}")
+                raise typer.Exit(code=1)
+
+        if not sessions:
+            console.print(f"[yellow]No sessions match pattern '{session_pattern}'[/yellow]")
+            return
+
+        # Show what will be closed
+        console.print(f"\n[yellow]About to close {len(sessions)} sessions:[/yellow]")
+        for session in sessions[:10]:
+            console.print(f"  • {session.id[:40]}... ({session.type.value}, PID: {session.pid})")
+        if len(sessions) > 10:
+            console.print(f"  ... and {len(sessions) - 10} more")
+
+        # Confirm operation
+        if not force:
+            console.print("\n[bold red]WARNING: This will terminate the processes![/bold red]")
+            confirm = typer.confirm("Continue?", default=False)
+            if not confirm:
+                console.print("[dim]Cancelled.[/dim]")
+                return
+
+        # Close sessions
+        import psutil
+        closed_count = 0
+        failed_count = 0
+
+        for session in sessions:
+            try:
+                # Try to terminate the process
+                process = psutil.Process(session.pid)
+                process.terminate()
+
+                # Update session status
+                session.status = SessionStatus.CLOSED
+                db.update_session(session)
+
+                closed_count += 1
+
+            except psutil.NoSuchProcess:
+                # Process already dead
+                session.status = SessionStatus.CLOSED
+                db.update_session(session)
+                closed_count += 1
+
+            except psutil.AccessDenied:
+                console.print(f"[yellow]Access denied for PID {session.pid}[/yellow]")
+                failed_count += 1
+
+            except Exception as e:
+                console.print(f"[red]Failed to close {session.id[:20]}...: {e}[/red]")
+                failed_count += 1
+
+        # Summary
+        console.print(f"\n[green]✓[/green] Closed {closed_count} sessions")
+        if failed_count > 0:
+            console.print(f"[yellow]Failed to close {failed_count} sessions[/yellow]")
+
+    except Exception as e:
+        console.print(f"[red]Error batch closing: {e}[/red]")
+        logger.error("batch_close_failed", error=str(e))
         raise typer.Exit(code=1)
 
 
@@ -1336,6 +1605,139 @@ def recommend():
 
 
 @app.command()
+def mcp_server(
+    db_path: str = typer.Option("data/sessions.db", "--db", help="Path to session database"),
+    memory_path: str = typer.Option("data/memories", "--memory", help="Path to memory storage")
+):
+    """Start the main MCP server for session management.
+
+    This server exposes all session data and operations via Model Context Protocol,
+    allowing MCP clients (like Claude Desktop) to query and interact with sessions.
+
+    Example usage in Claude Desktop config:
+    {
+      "mcpServers": {
+        "llm-session-manager": {
+          "command": "python",
+          "args": ["-m", "llm_session_manager.cli", "mcp-server"]
+        }
+      }
+    }
+    """
+    console.print("\n[cyan]Starting LLM Session Manager MCP Server...[/cyan]\n")
+
+    try:
+        from .mcp.server import MCPServer
+        import asyncio
+
+        server = MCPServer(db_path=db_path, memory_path=memory_path)
+
+        console.print("[green]MCP Server initialized successfully[/green]")
+        console.print(f"Database: {db_path}")
+        console.print(f"Memory: {memory_path}")
+        console.print("\n[yellow]Server is running. Connect via MCP client (e.g., Claude Desktop)[/yellow]\n")
+
+        # Run the server
+        asyncio.run(server.run())
+
+    except ImportError:
+        console.print("[red]Error: MCP not installed. Install with: pip install mcp[/red]")
+        raise typer.Exit(code=1)
+    except Exception as e:
+        console.print(f"[red]Error starting MCP server: {e}[/red]")
+        logger.error("mcp_server_start_failed", error=str(e))
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def mcp_session_server(
+    session_id: str = typer.Argument(..., help="Session ID to expose via MCP")
+):
+    """Start an enhanced MCP server for a specific session.
+
+    This server provides deep integration with a single session:
+    - Real-time file system monitoring
+    - Git repository analysis
+    - Enhanced token estimation
+    - Code change tracking
+
+    Example:
+        llm-session mcp-session-server abc123
+    """
+    console.print(f"\n[cyan]Starting MCP Server for session {session_id[:8]}...[/cyan]\n")
+
+    try:
+        from .mcp.session_server import SessionMCPServer
+        import asyncio
+
+        # Get session from database
+        db, _, _, _ = get_components()
+        session = db.get_session(session_id)
+
+        if not session:
+            console.print(f"[red]Error: Session {session_id} not found[/red]")
+            raise typer.Exit(code=1)
+
+        # Create and run server
+        server = SessionMCPServer(session)
+
+        console.print(f"[green]Session MCP Server initialized[/green]")
+        console.print(f"Session: {session.type.value}")
+        console.print(f"Working Directory: {session.working_directory}")
+        console.print("\n[yellow]Server is running. Connect via MCP client[/yellow]\n")
+
+        asyncio.run(server.run())
+
+    except ImportError:
+        console.print("[red]Error: MCP not installed. Install with: pip install mcp[/red]")
+        raise typer.Exit(code=1)
+    except Exception as e:
+        console.print(f"[red]Error starting session MCP server: {e}[/red]")
+        logger.error("session_mcp_server_failed", error=str(e))
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def mcp_config():
+    """Generate MCP server configuration for Claude Desktop.
+
+    Outputs the configuration JSON that should be added to Claude Desktop's
+    MCP settings file.
+    """
+    import os
+
+    # Get absolute path to Python interpreter and project
+    python_path = sys.executable
+    project_dir = Path(__file__).parent.parent
+
+    config = {
+        "mcpServers": {
+            "llm-session-manager": {
+                "command": python_path,
+                "args": ["-m", "llm_session_manager.cli", "mcp-server"],
+                "env": {
+                    "PYTHONPATH": str(project_dir)
+                }
+            }
+        }
+    }
+
+    console.print("\n[bold cyan]MCP Server Configuration[/bold cyan]\n")
+    console.print("Add this to your Claude Desktop configuration file:\n")
+    console.print("[yellow]" + json.dumps(config, indent=2) + "[/yellow]\n")
+
+    # Platform-specific config file locations
+    if sys.platform == "darwin":  # macOS
+        config_path = "~/Library/Application Support/Claude/claude_desktop_config.json"
+    elif sys.platform == "win32":  # Windows
+        config_path = "%APPDATA%\\Claude\\claude_desktop_config.json"
+    else:  # Linux
+        config_path = "~/.config/Claude/claude_desktop_config.json"
+
+    console.print(f"[dim]Configuration file location: {config_path}[/dim]\n")
+
+
+@app.command()
 def info():
     """Show information about the tool."""
     console.print("\n[bold cyan]LLM Session Manager[/bold cyan]")
@@ -1350,28 +1752,32 @@ def info():
     console.print("  • Context export/import (JSON, YAML, Markdown)")
     console.print("  • Session tagging and organization")
     console.print("  • Cross-session memory (semantic search with ChromaDB)")
+    console.print("  • MCP integration (Model Context Protocol)")
     console.print("  • Configurable via YAML")
     console.print("  • GitHub Copilot support")
     console.print()
     console.print("[bold]Commands:[/bold]")
-    console.print("  monitor       - Start the real-time dashboard")
-    console.print("  list          - List all active sessions")
-    console.print("  tag / untag   - Add/remove tags from a session")
-    console.print("  auto-tag      - AI-powered automatic tagging")
-    console.print("  describe      - Add description to a session")
-    console.print("  set-project   - Set project name for a session")
-    console.print("  batch-tag     - Tag multiple sessions at once")
-    console.print("  batch-export  - Export multiple sessions at once")
-    console.print("  export        - Export session context (JSON/YAML/Markdown)")
-    console.print("  import-context- Import session context")
-    console.print("  health        - Show health details")
-    console.print("  recommend     - Get smart recommendations")
-    console.print("  memory-add    - Save knowledge to cross-session memory")
-    console.print("  memory-search - Search memories semantically")
-    console.print("  memory-list   - List all memories")
-    console.print("  memory-stats  - Show memory system stats")
-    console.print("  init-config   - Create default configuration file")
-    console.print("  show-config   - Show current configuration")
+    console.print("  monitor          - Start the real-time dashboard")
+    console.print("  list             - List all active sessions")
+    console.print("  tag / untag      - Add/remove tags from a session")
+    console.print("  auto-tag         - AI-powered automatic tagging")
+    console.print("  describe         - Add description to a session")
+    console.print("  set-project      - Set project name for a session")
+    console.print("  batch-tag        - Tag multiple sessions at once")
+    console.print("  batch-export     - Export multiple sessions at once")
+    console.print("  export           - Export session context (JSON/YAML/Markdown)")
+    console.print("  import-context   - Import session context")
+    console.print("  health           - Show health details")
+    console.print("  recommend        - Get smart recommendations")
+    console.print("  memory-add       - Save knowledge to cross-session memory")
+    console.print("  memory-search    - Search memories semantically")
+    console.print("  memory-list      - List all memories")
+    console.print("  memory-stats     - Show memory system stats")
+    console.print("  mcp-server       - Start main MCP server")
+    console.print("  mcp-session-server - Start MCP server for specific session")
+    console.print("  mcp-config       - Generate MCP configuration for Claude Desktop")
+    console.print("  init-config      - Create default configuration file")
+    console.print("  show-config      - Show current configuration")
     console.print()
     console.print("Run [cyan]llm-session --help[/cyan] for more information.\n")
 

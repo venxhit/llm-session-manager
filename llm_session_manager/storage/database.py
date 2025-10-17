@@ -113,6 +113,21 @@ class Database:
                 )
             """)
 
+            # Tag feedback table for learning from user choices
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS tag_feedback (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT NOT NULL,
+                    suggested_tag TEXT NOT NULL,
+                    accepted BOOLEAN NOT NULL,
+                    source TEXT DEFAULT 'heuristic',
+                    context_tags TEXT,
+                    file_extensions TEXT,
+                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE
+                )
+            """)
+
             # Create indexes for common queries
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_sessions_status
@@ -129,6 +144,10 @@ class Database:
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_memories_session
                 ON memories(source_session)
+            """)
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_tag_feedback
+                ON tag_feedback(suggested_tag, accepted)
             """)
 
             logger.info("database_schema_initialized")
@@ -450,3 +469,112 @@ class Database:
             tags=tags,
             relevance_score=row["relevance_score"],
         )
+
+    def add_tag_feedback(
+        self,
+        session_id: str,
+        suggested_tag: str,
+        accepted: bool,
+        source: str = "heuristic",
+        context_tags: Optional[List[str]] = None,
+        file_extensions: Optional[List[str]] = None
+    ) -> None:
+        """Record user feedback on tag suggestions for learning.
+
+        Args:
+            session_id: Session the tag was suggested for.
+            suggested_tag: The tag that was suggested.
+            accepted: Whether user accepted the tag.
+            source: Source of suggestion (heuristic, ai, hybrid).
+            context_tags: Other tags present at time of suggestion.
+            file_extensions: File extensions found in session.
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO tag_feedback (
+                    session_id, suggested_tag, accepted, source, context_tags, file_extensions
+                ) VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                session_id,
+                suggested_tag,
+                accepted,
+                source,
+                json.dumps(context_tags) if context_tags else None,
+                json.dumps(file_extensions) if file_extensions else None,
+            ))
+            logger.debug("tag_feedback_recorded",
+                        tag=suggested_tag,
+                        accepted=accepted)
+
+    def get_tag_acceptance_rate(self, tag: str) -> float:
+        """Get historical acceptance rate for a tag.
+
+        Args:
+            tag: Tag to query.
+
+        Returns:
+            Acceptance rate (0.0 to 1.0), or 0.5 if no data.
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT
+                    SUM(CASE WHEN accepted THEN 1 ELSE 0 END) as accepted_count,
+                    COUNT(*) as total_count
+                FROM tag_feedback
+                WHERE suggested_tag = ?
+            """, (tag,))
+            row = cursor.fetchone()
+
+            if row and row["total_count"] > 0:
+                return row["accepted_count"] / row["total_count"]
+            return 0.5  # Neutral default
+
+    def get_tag_suggestions_insights(self, limit: int = 20) -> List[Dict[str, Any]]:
+        """Get insights about tag suggestions for improving algorithm.
+
+        Args:
+            limit: Number of top tags to return.
+
+        Returns:
+            List of dicts with tag statistics.
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT
+                    suggested_tag,
+                    SUM(CASE WHEN accepted THEN 1 ELSE 0 END) as accepted,
+                    SUM(CASE WHEN NOT accepted THEN 1 ELSE 0 END) as rejected,
+                    COUNT(*) as total,
+                    CAST(SUM(CASE WHEN accepted THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) as acceptance_rate,
+                    source
+                FROM tag_feedback
+                GROUP BY suggested_tag, source
+                ORDER BY total DESC
+                LIMIT ?
+            """, (limit,))
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    def search_sessions_by_description(self, query: str) -> List[Session]:
+        """Search sessions by description text.
+
+        Args:
+            query: Search query string.
+
+        Returns:
+            List of matching Session objects.
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            # Use LIKE for simple text search
+            search_pattern = f"%{query}%"
+            cursor.execute("""
+                SELECT * FROM sessions
+                WHERE description LIKE ?
+                ORDER BY last_activity DESC
+            """, (search_pattern,))
+            rows = cursor.fetchall()
+            return [self._row_to_session(row) for row in rows]

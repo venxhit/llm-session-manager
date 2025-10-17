@@ -8,16 +8,27 @@ A terminal-native tool for engineering teams running 5-10+ parallel AI coding se
 
 ## Features
 
+### Core Features
 - 🔍 **Session Discovery** - Automatically finds running Claude Code, Cursor, and GitHub Copilot sessions
 - 📊 **Real-time Dashboard** - Live TUI with auto-refresh
 - 🪙 **Token Tracking** - Precise token counting with tiktoken (no more estimates!)
 - ❤️ **Health Monitoring** - Multi-factor health scoring (tokens, duration, activity, errors)
 - 💾 **Context Export/Import** - Save and restore sessions in JSON, YAML, or Markdown
-- 🏷️ **Session Tagging** - Organize sessions with tags and project names
-- 🧠 **Cross-Session Memory** - Semantic search across all sessions using ChromaDB (THE KILLER FEATURE!)
+- 🧠 **Cross-Session Memory** - Semantic search across all sessions using ChromaDB
 - ⚙️ **YAML Configuration** - Customize token limits, health weights, and thresholds
 - 🤖 **Smart Recommendations** - AI-powered suggestions for session management
 - 🎨 **Rich CLI** - Beautiful terminal output with colors and emojis
+
+### NEW Features (v0.2.0) 🎉
+- 🏷️ **AI-Powered Auto-Tagging** - Intelligent tag suggestions using Claude AI + heuristic analysis
+- 📝 **AI-Generated Descriptions** - Automatic session descriptions based on project analysis
+- 🔍 **Description Search** - Find sessions by searching description text
+- 🧠 **Tag Learning System** - Learns from your accept/reject decisions to improve suggestions
+- 🚀 **Batch Close Operations** - Close multiple sessions at once with filtering
+- 📊 **Tag Feedback Analytics** - Track which tags work best for different project types
+- 🔌 **MCP Integration** - Model Context Protocol support for Claude Desktop and other MCP clients
+- 🌐 **MCP Server** - Expose sessions via standardized protocol (resources, tools, prompts)
+- 🔧 **Enhanced Session Servers** - Deep integration with git, file system, and real-time metrics
 
 ## Installation
 
@@ -85,6 +96,66 @@ python -m llm_session_manager.cli tag <session-id> backend api feature-xyz
 python -m llm_session_manager.cli untag <session-id> old-tag
 python -m llm_session_manager.cli set-project <session-id> "My Web App"
 ```
+
+### `auto-tag` (NEW! 🎉)
+AI-powered automatic tag suggestions with learning from user feedback.
+
+```bash
+# Heuristic-based suggestions (file extensions, imports, keywords)
+python -m llm_session_manager.cli auto-tag <session-id>
+
+# AI-powered suggestions (requires ANTHROPIC_API_KEY)
+python -m llm_session_manager.cli auto-tag <session-id> --ai
+
+# Interactive selection (choose tags one by one)
+python -m llm_session_manager.cli auto-tag <session-id> --interactive
+
+# Auto-apply without confirmation
+python -m llm_session_manager.cli auto-tag <session-id> --apply
+```
+
+**Features:**
+- **Heuristic Analysis**: Analyzes file extensions, directory structure, imports, and keywords
+- **AI-Powered**: Uses Claude to understand project context and suggest relevant tags
+- **Learning System**: Records your accept/reject decisions to improve future suggestions
+- **Interactive Mode**: Choose which tags to apply individually
+
+### `describe` (ENHANCED! ✨)
+Add or generate AI-powered descriptions for sessions.
+
+```bash
+# Manual description
+python -m llm_session_manager.cli describe <session-id> "Working on auth feature"
+
+# AI-generated description (requires ANTHROPIC_API_KEY)
+python -m llm_session_manager.cli describe <session-id> --ai
+
+# View current description
+python -m llm_session_manager.cli describe <session-id> --show
+```
+
+**AI descriptions analyze:**
+- Project structure and file types
+- README content
+- Package metadata (package.json, pyproject.toml)
+- Code patterns and frameworks
+- Existing tags and project context
+
+### `search` (NEW! 🔍)
+Search sessions by description text.
+
+```bash
+# Basic search
+python -m llm_session_manager.cli search "authentication"
+
+# Show full details
+python -m llm_session_manager.cli search "API" --details
+```
+
+**Perfect for:**
+- Finding sessions working on specific features
+- Locating sessions by technology or framework
+- Quick lookup across all your coding sessions
 
 ### `export`
 Export session context to JSON, YAML, or Markdown.
@@ -165,6 +236,65 @@ python -m llm_session_manager.cli memory-stats
 - Knowledge persists across all sessions
 - No more re-explaining context when switching sessions!
 
+### `batch-tag / batch-export / batch-close` (ENHANCED! 🚀)
+Perform operations on multiple sessions at once.
+
+```bash
+# Tag multiple sessions
+python -m llm_session_manager.cli batch-tag all backend api
+python -m llm_session_manager.cli batch-tag "test-*" testing experimental
+
+# Export multiple sessions
+python -m llm_session_manager.cli batch-export all --output-dir ./exports --format json
+python -m llm_session_manager.cli batch-export "project-*" --format markdown
+
+# Close multiple sessions (NEW!)
+python -m llm_session_manager.cli batch-close "test-*"
+python -m llm_session_manager.cli batch-close all --status idle  # Close only idle sessions
+python -m llm_session_manager.cli batch-close all --force        # Skip confirmation
+```
+
+**Use cases:**
+- Clean up multiple test/experimental sessions at once
+- Close all idle sessions to free up resources
+- Batch export for backups or documentation
+- Apply consistent tagging across related sessions
+
+**Safety features:**
+- Confirmation prompts before destructive operations
+- Session filtering by pattern and status
+- Preview of affected sessions before execution
+
+### `mcp-server / mcp-session-server / mcp-config` (NEW! 🔌)
+Model Context Protocol integration for Claude Desktop and other MCP clients.
+
+```bash
+# Start main MCP server (exposes all sessions)
+python -m llm_session_manager.cli mcp-server
+
+# Start enhanced server for specific session
+python -m llm_session_manager.cli mcp-session-server <session-id>
+
+# Generate Claude Desktop configuration
+python -m llm_session_manager.cli mcp-config
+```
+
+**What you can do in Claude Desktop:**
+- "List all my coding sessions"
+- "Find sessions tagged with 'backend'"
+- "Search my past sessions for JWT authentication examples"
+- "Which session should I use for this authentication task?"
+- "Export session abc123 as markdown"
+- "Check health of all my sessions"
+
+**Features:**
+- **Resources**: Query session data, health metrics, memory stats
+- **Tools**: Search memory, find sessions, export context, get recommendations
+- **Prompts**: Pre-built workflows for common tasks
+- **Phase 2 Enhancement**: Real-time git analysis, file monitoring, enhanced metrics
+
+See [docs/MCP_INTEGRATION.md](docs/MCP_INTEGRATION.md) for complete guide.
+
 ## Testing
 
 Run the automated test suite:
@@ -240,6 +370,7 @@ mypy .
 
 ## Documentation
 
+- [docs/MCP_INTEGRATION.md](docs/MCP_INTEGRATION.md) - Model Context Protocol integration guide
 - [docs/QUICK_TEST.md](docs/QUICK_TEST.md) - 5-minute testing guide
 - [docs/TESTING_GUIDE.md](docs/TESTING_GUIDE.md) - Comprehensive testing instructions
 - [docs/CLI_GUIDE.md](docs/CLI_GUIDE.md) - Complete CLI reference
