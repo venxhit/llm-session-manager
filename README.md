@@ -30,6 +30,18 @@ A terminal-native tool for engineering teams running 5-10+ parallel AI coding se
 - 🌐 **MCP Server** - Expose sessions via standardized protocol (resources, tools, prompts)
 - 🔧 **Enhanced Session Servers** - Deep integration with git, file system, and real-time metrics
 
+### NEW Features (v0.3.0) 🚀 REAL-TIME COLLABORATION
+- 👥 **Multi-User Sessions** - Multiple developers can join the same coding session
+- 💬 **Real-Time Chat** - Instant messaging within collaborative sessions
+- 📍 **Cursor Tracking** - See where other users are working in real-time
+- 💭 **Code Comments** - Annotate code at specific file:line locations
+- 🎭 **Role-Based Permissions** - Host/Editor/Viewer roles with granular access control
+- ⚡ **WebSocket Communication** - Real-time bidirectional updates via WebSocket
+- 🌐 **React Frontend** - Beautiful dark-mode collaborative UI with TailwindCSS
+- 🔐 **JWT Authentication** - Secure session access with token-based auth
+- 📊 **Presence System** - Track user status (active/idle/away) automatically
+- 🎯 **Event Recording** - Complete audit trail of all collaboration activities
+
 ## Installation
 
 ```bash
@@ -295,6 +307,82 @@ python -m llm_session_manager.cli mcp-config
 
 See [docs/MCP_INTEGRATION.md](docs/MCP_INTEGRATION.md) for complete guide.
 
+## Real-Time Collaboration (NEW! 🚀)
+
+Enable multiple developers to collaborate in the same coding session with real-time updates.
+
+### Quick Start
+
+**1. Start Backend:**
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+**2. Start Frontend:**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+**3. Open Browser:**
+- Visit http://localhost:3000
+- Create or join a session
+- Start collaborating!
+
+### Features
+
+**Multi-User Sessions:**
+- Host can invite editors and viewers
+- Real-time participant list
+- Join/leave notifications
+
+**Chat & Messaging:**
+- Instant chat messages
+- Code comments at specific lines
+- @mentions support
+- Emoji reactions
+- Threaded replies
+
+**Presence & Awareness:**
+- See who's online/active/idle/away
+- Track cursor positions in real-time
+- View what files others are editing
+- "Follow" other users' cursors
+
+**Collaboration Tools:**
+- Broadcast messages to all users
+- Direct messages to specific users
+- Code annotations
+- Session events audit trail
+
+### Documentation
+
+- [REALTIME_COLLABORATION_COMPLETE.md](REALTIME_COLLABORATION_COMPLETE.md) - Complete implementation guide
+- [QUICKSTART_DEMO.md](QUICKSTART_DEMO.md) - 5-minute demo walkthrough
+- [docs/REALTIME_COLLABORATION.md](docs/REALTIME_COLLABORATION.md) - Full architecture and API reference
+- [TESTING_GUIDE.md](TESTING_GUIDE.md) - WebSocket testing guide
+
+### Architecture
+
+```
+Frontend (React + Vite)
+    ↓ WebSocket
+Backend (FastAPI)
+    ↓
+┌─────────────────────┐
+│ Connection Manager  │  Track WebSocket connections
+│ Presence Manager    │  Monitor user status/cursors
+│ Chat Manager        │  Handle messages/comments
+└─────────────────────┘
+    ↓
+SQLite Database
+```
+
+See [REALTIME_COLLABORATION_COMPLETE.md](REALTIME_COLLABORATION_COMPLETE.md) for complete details.
+
 ## Testing
 
 Run the automated test suite:
@@ -436,11 +524,20 @@ Contributions welcome! Please read the testing guide before submitting PRs.
 - Cross-session memory (ChromaDB)
 - Configuration management
 
+**✅ Completed (v0.3.0):**
+- Real-time collaboration system
+- Multi-user sessions with WebSocket
+- React frontend with collaborative UI
+- Chat, presence, and cursor tracking
+- Role-based permissions
+- JWT authentication
+
 **📅 Upcoming:**
-- Team dashboard (web UI)
+- Collaborative editing with OT/CRDTs
+- Voice/video chat integration
 - VS Code extension
 - GitHub Actions integration
-- Session collaboration features
+- Session recording and playback
 
 See `PRODUCT_BRIEF.md` for detailed roadmap.
 
