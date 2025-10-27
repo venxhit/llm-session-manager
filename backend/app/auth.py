@@ -67,14 +67,17 @@ def get_current_user(
     token = credentials.credentials
     payload = decode_token(token)
 
-    user_id: str = payload.get("sub")
+    user_id: str = payload.get("user_id") or payload.get("sub")
     if user_id is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials"
         )
 
+    # Try to find user by id first, then by username
     user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        user = db.query(User).filter(User.username == user_id).first()
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -105,14 +108,17 @@ async def get_current_user_ws(token: str, db: Session) -> User:
     """
     payload = decode_token(token)
 
-    user_id: str = payload.get("sub")
+    user_id: str = payload.get("user_id") or payload.get("sub")
     if user_id is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials"
         )
 
+    # Try to find user by id first, then by username
     user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        user = db.query(User).filter(User.username == user_id).first()
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

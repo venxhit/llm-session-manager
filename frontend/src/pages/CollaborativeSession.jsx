@@ -4,6 +4,7 @@ import { useWebSocket } from '../hooks/useWebSocket';
 import PresenceBar from '../components/PresenceBar';
 import ChatPanel from '../components/ChatPanel';
 import { CursorIndicatorList } from '../components/CursorIndicator';
+import SessionMetrics from '../components/SessionMetrics';
 
 /**
  * Main collaborative session page
@@ -241,6 +242,9 @@ const CollaborativeSession = () => {
 
       {/* Main content */}
       <div className="max-w-7xl mx-auto">
+        {/* Session Metrics */}
+        <SessionMetrics sessionId={sessionId} />
+
         {/* Presence bar */}
         <PresenceBar
           participants={participants}

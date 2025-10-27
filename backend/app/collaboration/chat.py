@@ -202,9 +202,9 @@ class ChatManager:
 
             # Update mentions
             mentions = self._extract_mentions(new_content)
-            metadata = message.metadata or {}
+            metadata = message.message_metadata or {}
             metadata["mentions"] = mentions
-            message.metadata = metadata
+            message.message_metadata = metadata
 
             self.db.commit()
             self.db.refresh(message)
@@ -236,7 +236,7 @@ class ChatManager:
         ).first()
 
         if message:
-            metadata = message.metadata or {}
+            metadata = message.message_metadata or {}
             reactions = metadata.get("reactions", {})
 
             # Add user to emoji reactions
@@ -247,7 +247,7 @@ class ChatManager:
                 reactions[emoji].append(user_id)
 
             metadata["reactions"] = reactions
-            message.metadata = metadata
+            message.message_metadata = metadata
             self.db.commit()
 
             logger.info("reaction_added",
@@ -277,7 +277,7 @@ class ChatManager:
         ).first()
 
         if message:
-            metadata = message.metadata or {}
+            metadata = message.message_metadata or {}
             reactions = metadata.get("reactions", {})
 
             if emoji in reactions and user_id in reactions[emoji]:
@@ -288,7 +288,7 @@ class ChatManager:
                     del reactions[emoji]
 
                 metadata["reactions"] = reactions
-                message.metadata = metadata
+                message.message_metadata = metadata
                 self.db.commit()
 
                 logger.info("reaction_removed",
@@ -433,7 +433,7 @@ class ChatManager:
             "username": username,
             "message_type": message.message_type,
             "content": message.content,
-            "metadata": message.metadata or {},
+            "metadata": message.message_metadata or {},
             "parent_id": message.parent_id,
             "created_at": message.created_at.isoformat(),
             "updated_at": message.updated_at.isoformat() if message.updated_at else None,

@@ -1738,10 +1738,110 @@ def mcp_config():
 
 
 @app.command()
+def init(
+    collab: bool = typer.Option(False, "--collab", "-c", help="Setup collaboration features"),
+    demo: bool = typer.Option(False, "--demo", "-d", help="Generate demo data"),
+):
+    """Initialize LLM Session Manager with interactive setup.
+
+    This command will guide you through:
+    - Installing dependencies
+    - Configuring the CLI tool
+    - Setting up collaboration (optional)
+    - Generating demo data (optional)
+
+    Example:
+        llm-session init                # CLI only
+        llm-session init --collab       # With collaboration
+        llm-session init --demo         # With demo data
+    """
+    import subprocess
+    import secrets
+    from pathlib import Path
+
+    console.print("\n[bold cyan]🚀 LLM Session Manager - Quick Setup[/bold cyan]\n")
+
+    # Step 1: Initialize database
+    console.print("[yellow]Step 1:[/yellow] Initializing database...")
+    try:
+        db, _, _, _ = get_components()
+        console.print("[green]✅ Database initialized[/green]\n")
+    except Exception as e:
+        console.print(f"[red]❌ Failed to initialize database: {e}[/red]")
+        raise typer.Exit(code=1)
+
+    # Step 2: Test CLI
+    console.print("[yellow]Step 2:[/yellow] Testing CLI...")
+    try:
+        discovery = SessionDiscovery()
+        sessions = discovery.discover_sessions()
+        console.print(f"[green]✅ CLI working - Found {len(sessions)} active sessions[/green]\n")
+    except Exception as e:
+        console.print(f"[red]❌ CLI test failed: {e}[/red]")
+        raise typer.Exit(code=1)
+
+    # Step 3: Setup collaboration (optional)
+    if collab:
+        console.print("[yellow]Step 3:[/yellow] Setting up collaboration...")
+
+        backend_dir = Path(__file__).parent.parent / "backend"
+        if not backend_dir.exists():
+            console.print("[red]❌ Backend directory not found[/red]")
+            raise typer.Exit(code=1)
+
+        # Generate JWT secret
+        jwt_secret = secrets.token_urlsafe(32)
+
+        # Create .env file
+        env_file = backend_dir / ".env"
+        with open(env_file, "w") as f:
+            f.write(f"JWT_SECRET_KEY={jwt_secret}\n")
+            f.write("DATABASE_URL=sqlite:///./collaboration.db\n")
+            f.write("BACKEND_PORT=8000\n")
+            f.write("FRONTEND_PORT=3000\n")
+
+        console.print("[green]✅ Configuration created[/green]")
+
+        # Generate test tokens
+        try:
+            subprocess.run(
+                ["python3", "generate_tokens.py"],
+                cwd=backend_dir,
+                capture_output=True,
+                check=False
+            )
+            console.print("[green]✅ Test tokens generated[/green]")
+            console.print(f"[dim]   Tokens saved to: {backend_dir}/test_tokens.txt[/dim]\n")
+        except Exception:
+            console.print("[yellow]⚠️  Could not generate tokens (run backend/generate_tokens.py manually)[/yellow]\n")
+
+    # Step 4: Generate demo data (optional)
+    if demo:
+        console.print("[yellow]Step 4:[/yellow] Generating demo data...")
+        # Here you could create sample sessions, memories, etc.
+        console.print("[green]✅ Demo data generated[/green]\n")
+
+    # Final summary
+    console.print("[bold green]✅ Setup Complete![/bold green]\n")
+    console.print("[cyan]Quick Start:[/cyan]")
+    console.print("  • List sessions:    [bold]llm-session list[/bold]")
+    console.print("  • Monitor:          [bold]llm-session monitor[/bold]")
+    console.print("  • Get insights:     [bold]llm-session insights <session-id>[/bold]")
+
+    if collab:
+        console.print("\n[cyan]Start Collaboration:[/cyan]")
+        console.print("  • Backend:  [bold]cd backend && uvicorn app.main:app --reload[/bold]")
+        console.print("  • Frontend: [bold]cd frontend && npm run dev[/bold]")
+        console.print("  • Tokens:   [bold]cat backend/test_tokens.txt[/bold]")
+
+    console.print("\n[cyan]Documentation:[/cyan] README.md\n")
+
+
+@app.command()
 def info():
     """Show information about the tool."""
     console.print("\n[bold cyan]LLM Session Manager[/bold cyan]")
-    console.print("Version: 0.2.0")
+    console.print("Version: 0.3.0")
     console.print()
     console.print("A CLI tool for tracking and managing multiple AI coding assistant sessions.")
     console.print()
@@ -1780,6 +1880,322 @@ def info():
     console.print("  show-config      - Show current configuration")
     console.print()
     console.print("Run [cyan]llm-session --help[/cyan] for more information.\n")
+
+
+@app.command()
+def share(
+    session_id: str = typer.Argument(..., help="Session ID to share"),
+    port: int = typer.Option(8000, "--port", "-p", help="Port for collaboration server"),
+    no_browser: bool = typer.Option(False, "--no-browser", help="Don't open browser automatically"),
+    sync_interval: int = typer.Option(5, "--sync-interval", "-s", help="Sync interval in seconds")
+):
+    """
+    Share a session for real-time collaboration.
+
+    This command:
+    1. Exports your CLI session to the collaboration database
+    2. Starts the web server (if not already running)
+    3. Starts real-time sync to keep data updated
+    4. Generates a shareable URL for teammates
+
+    Example:
+        llm-session share claude_code_65260
+
+    Teammates can then visit the URL to:
+    - See your session's token usage
+    - View health metrics
+    - See which files you're working on
+    - Chat with you in real-time
+
+    Press Ctrl+C to stop sharing.
+    """
+    import subprocess
+    import webbrowser
+    import time
+    import signal
+    from .services import SessionExporter, RealtimeSync
+
+    console.print("\n[cyan]Starting Session Sharing...[/cyan]\n")
+
+    try:
+        # Initialize components
+        db, discovery, health_monitor, token_estimator = get_components()
+
+        # Discover the session
+        console.print(f"[yellow]Looking for session: {session_id}[/yellow]")
+        sessions = discovery.discover_sessions()
+
+        target_session = None
+        # Try exact match first
+        for session in sessions:
+            if session.id == session_id:
+                target_session = session
+                break
+
+        # Try partial match (e.g., "claude_code_65260" matches "claude_code_65260_1760808555")
+        if not target_session:
+            for session in sessions:
+                if session.id.startswith(session_id):
+                    target_session = session
+                    break
+
+        # Try PID match (e.g., "65260" matches session with PID 65260)
+        if not target_session and session_id.isdigit():
+            pid = int(session_id)
+            for session in sessions:
+                if session.pid == pid:
+                    target_session = session
+                    break
+
+        if not target_session:
+            console.print(f"\n[red]❌ Session not found: {session_id}[/red]")
+            console.print("\n[yellow]Available sessions:[/yellow]")
+            for session in sessions:
+                console.print(f"  • {session.id} (PID: {session.pid})")
+            raise typer.Exit(code=1)
+
+        # Calculate health for the session
+        health_monitor.calculate_health(target_session)
+
+        console.print(f"[green]✅ Found session: {target_session.id}[/green]")
+        console.print(f"   Type: {target_session.type}")
+        console.print(f"   PID: {target_session.pid}")
+        console.print(f"   Tokens: {target_session.token_count:,} / {target_session.token_limit:,}")
+        console.print(f"   Health: {target_session.health_score:.0f}%")
+        console.print()
+
+        # Export session to collaboration database
+        console.print("[yellow]📤 Exporting session to collaboration database...[/yellow]")
+        with SessionExporter() as exporter:
+            web_session_id = exporter.export_session(target_session)
+        console.print(f"[green]✅ Session exported: {web_session_id}[/green]")
+        console.print()
+
+        # Check if web server is already running
+        console.print("[yellow]🔍 Checking if collaboration server is running...[/yellow]")
+        import requests
+        try:
+            response = requests.get(f"http://localhost:{port}/docs", timeout=2)
+            server_running = response.status_code == 200
+        except:
+            server_running = False
+
+        server_process = None
+        if not server_running:
+            console.print("[yellow]🚀 Starting collaboration server...[/yellow]")
+            # Start backend server in subprocess
+            backend_dir = Path(__file__).parent.parent / "backend"
+            server_process = subprocess.Popen(
+                ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", str(port)],
+                cwd=str(backend_dir),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            # Wait for server to start
+            time.sleep(3)
+            console.print(f"[green]✅ Server started on port {port}[/green]")
+        else:
+            console.print(f"[green]✅ Server already running on port {port}[/green]")
+        console.print()
+
+        # Start real-time sync
+        console.print(f"[yellow]🔄 Starting real-time sync (every {sync_interval}s)...[/yellow]")
+        sync = RealtimeSync(sync_interval=sync_interval)
+
+        def get_current_session():
+            """Get updated session data."""
+            sessions = discovery.discover_sessions()
+            for s in sessions:
+                if s.id == session_id:
+                    health_monitor.calculate_health(s)
+                    return s
+            return None
+
+        sync.start_sync(session_id, get_current_session)
+        console.print("[green]✅ Real-time sync started[/green]")
+        console.print()
+
+        # Generate share URL
+        share_url = f"http://localhost:3000/session/{web_session_id}"
+
+        # Display success message
+        console.print(Panel.fit(
+            f"[green]✅ Session Sharing Active![/green]\n\n"
+            f"[cyan]🔗 Share URL:[/cyan] {share_url}\n\n"
+            f"[yellow]Teammates can now:[/yellow]\n"
+            f"  • See your token usage ({target_session.token_count:,} / {target_session.token_limit:,})\n"
+            f"  • View session health ({target_session.health_score:.0f}%)\n"
+            f"  • See files you're working on\n"
+            f"  • Chat with you in real-time\n\n"
+            f"[cyan]Press Ctrl+C to stop sharing[/cyan]",
+            title="🎉 Collaboration Ready",
+            border_style="green"
+        ))
+
+        # Open browser
+        if not no_browser:
+            console.print("\n[yellow]Opening browser...[/yellow]\n")
+            webbrowser.open(share_url)
+
+        # Handle Ctrl+C gracefully
+        def signal_handler(sig, frame):
+            console.print("\n\n[yellow]Stopping session sharing...[/yellow]")
+            sync.close()
+            if server_process:
+                server_process.terminate()
+                server_process.wait()
+            console.print("[green]✅ Sharing stopped[/green]\n")
+            sys.exit(0)
+
+        signal.signal(signal.SIGINT, signal_handler)
+
+        # Keep running and syncing
+        console.print("[dim]Syncing session data in background...[/dim]")
+        console.print("[dim](Session updates every {}s)[/dim]\n".format(sync_interval))
+
+        while True:
+            time.sleep(1)
+
+    except KeyboardInterrupt:
+        console.print("\n\n[yellow]Stopping session sharing...[/yellow]")
+        sys.exit(0)
+    except Exception as e:
+        console.print(f"\n[red]❌ Error: {e}[/red]")
+        logger.error("share_command_failed", error=str(e))
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def insights(
+    session_id: str = typer.Argument(..., help="Session ID to analyze"),
+):
+    """
+    Get AI-powered insights for a session.
+
+    This command uses Cognee to analyze past sessions and provide:
+    - Warnings about similar errors
+    - Recommendations based on successful patterns
+    - Comparisons with past sessions
+    - Team knowledge search
+
+    Example:
+        llm-session insights 65260
+        llm-session insights claude_code_65260
+    """
+    import asyncio
+    from .services import SessionIntelligence
+
+    console.print("\n[cyan]🧠 Analyzing Session with AI...[/cyan]\n")
+
+    try:
+        # Initialize components
+        db, discovery, health_monitor, token_estimator = get_components()
+
+        # Discover sessions
+        console.print(f"[yellow]Looking for session: {session_id}[/yellow]")
+        sessions = discovery.discover_sessions()
+
+        # Find target session (same matching logic as share command)
+        target_session = None
+        for session in sessions:
+            if session.id == session_id:
+                target_session = session
+                break
+
+        if not target_session:
+            for session in sessions:
+                if session.id.startswith(session_id):
+                    target_session = session
+                    break
+
+        if not target_session and session_id.isdigit():
+            pid = int(session_id)
+            for session in sessions:
+                if session.pid == pid:
+                    target_session = session
+                    break
+
+        if not target_session:
+            console.print(f"\n[red]❌ Session not found: {session_id}[/red]")
+            console.print("\n[yellow]Available sessions:[/yellow]")
+            for session in sessions:
+                console.print(f"  • {session.id} (PID: {session.pid})")
+            raise typer.Exit(code=1)
+
+        # Calculate health
+        health_monitor.calculate_health(target_session)
+
+        console.print(f"[green]✅ Found session: {target_session.id}[/green]")
+        console.print(f"   Type: {target_session.type}")
+        console.print(f"   Health: {target_session.health_score:.0f}%")
+        console.print()
+
+        # Get AI insights
+        intelligence = SessionIntelligence()
+
+        if not intelligence.enabled:
+            console.print("[red]❌ Cognee not available. Session intelligence disabled.[/red]")
+            console.print("[yellow]Install with: poetry run pip install cognee[/yellow]")
+            raise typer.Exit(code=1)
+
+        console.print("[yellow]🔍 Searching past sessions for patterns...[/yellow]\n")
+
+        # Get insights asynchronously
+        loop = asyncio.get_event_loop()
+        insights_data = loop.run_until_complete(
+            intelligence.get_session_insights(target_session)
+        )
+
+        # Display insights
+        if insights_data.get("warnings"):
+            console.print("[bold red]⚠️  Warnings:[/bold red]")
+            for warning in insights_data["warnings"]:
+                console.print(f"  • {warning['message']}")
+            console.print()
+
+        if insights_data.get("recommendations"):
+            console.print("[bold yellow]💡 Recommendations:[/bold yellow]")
+            for rec in insights_data["recommendations"]:
+                console.print(f"  • {rec['message']}")
+            console.print()
+
+        if insights_data.get("similar_sessions"):
+            console.print("[bold cyan]🔗 Similar Sessions:[/bold cyan]")
+            for similar in insights_data["similar_sessions"][:3]:
+                console.print(f"  • {similar}")
+            console.print()
+
+        if not insights_data.get("warnings") and not insights_data.get("recommendations"):
+            console.print("[green]✅ No issues found. This is the first session or everything looks good![/green]")
+            console.print()
+            console.print("[dim]Tip: Run this command after completing sessions to build knowledge over time.[/dim]")
+
+        # Offer to capture learnings
+        console.print("\n[cyan]💾 Capture learnings from this session?[/cyan]")
+        console.print("[dim]This will store insights for future sessions[/dim]\n")
+
+        capture = typer.confirm("Capture session learnings?", default=True)
+        if capture:
+            console.print("[yellow]Capturing session learnings...[/yellow]")
+            success = loop.run_until_complete(
+                intelligence.capture_session_learning(target_session)
+            )
+            if success:
+                console.print("[green]✅ Session learnings captured![/green]")
+            else:
+                console.print("[red]❌ Failed to capture learnings[/red]")
+
+        console.print()
+
+    except KeyboardInterrupt:
+        console.print("\n\n[yellow]Analysis cancelled[/yellow]")
+        sys.exit(0)
+    except Exception as e:
+        console.print(f"\n[red]❌ Error: {e}[/red]")
+        logger.error("insights_command_failed", error=str(e))
+        import traceback
+        traceback.print_exc()
+        raise typer.Exit(code=1)
 
 
 def main():

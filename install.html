@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Session Manager - One-Click Install</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 800px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            color: #667eea;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 1.1em;
+        }
+
+        .install-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+
+        .install-section h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        .command-box {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            position: relative;
+            margin: 15px 0;
+            overflow-x: auto;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+
+        .copy-btn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+
+        .copy-btn.copied {
+            background: #10b981;
+        }
+
+        .steps {
+            list-style: none;
+            counter-reset: step-counter;
+        }
+
+        .steps li {
+            counter-increment: step-counter;
+            margin-bottom: 20px;
+            padding-left: 40px;
+            position: relative;
+        }
+
+        .steps li::before {
+            content: counter(step-counter);
+            position: absolute;
+            left: 0;
+            top: 0;
+            background: #667eea;
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            background: #e2e8f0;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .tab:hover {
+            background: #cbd5e0;
+        }
+
+        .tab.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .feature {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .feature-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .alert {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+
+        .success {
+            background: #d1fae5;
+            border-left: 4px solid #10b981;
+        }
+
+        .cta-button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        .cta-button:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .demo-button {
+            background: #10b981;
+        }
+
+        .demo-button:hover {
+            background: #059669;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+            }
+            h1 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 LLM Session Manager</h1>
+        <p class="subtitle">Monitor • Collaborate • Learn from AI Sessions</p>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('quickest')">⚡ Quickest (30s)</button>
+            <button class="tab" onclick="showTab('docker')">🐳 Docker</button>
+            <button class="tab" onclick="showTab('manual')">🛠️ Manual</button>
+            <button class="tab" onclick="showTab('demo')">🎯 Try Demo</button>
+        </div>
+
+        <!-- QUICKEST METHOD -->
+        <div id="quickest" class="tab-content active">
+            <div class="install-section">
+                <h2>⚡ Instant Install (One Command)</h2>
+                <p style="margin-bottom: 15px;">Copy and run this command to install everything:</p>
+
+                <div class="command-box">
+                    <button class="copy-btn" onclick="copyCommand('quick-install')">Copy</button>
+                    <code id="quick-install">curl -fsSL https://raw.githubusercontent.com/yourusername/llm-session-manager/main/setup.sh | bash</code>
+                </div>
+
+                <div class="alert success">
+                    <strong>✅ What this does:</strong>
+                    <ul style="margin-left: 20px; margin-top: 10px;">
+                        <li>Checks all prerequisites</li>
+                        <li>Installs Python dependencies</li>
+                        <li>Sets up CLI tool</li>
+                        <li>Optionally installs collaboration features</li>
+                        <li>Generates test tokens</li>
+                        <li>Ready to use in 30 seconds!</li>
+                    </ul>
+                </div>
+
+                <p style="margin-top: 20px;"><strong>Then start using:</strong></p>
+                <div class="command-box">
+                    <button class="copy-btn" onclick="copyCommand('start-cli')">Copy</button>
+                    <code id="start-cli">poetry run python -m llm_session_manager.cli list</code>
+                </div>
+            </div>
+        </div>
+
+        <!-- DOCKER METHOD -->
+        <div id="docker" class="tab-content">
+            <div class="install-section">
+                <h2>🐳 Docker Compose (Zero Config)</h2>
+                <p style="margin-bottom: 15px;">Perfect if you have Docker installed:</p>
+
+                <ol class="steps">
+                    <li>
+                        <strong>Clone the repository:</strong>
+                        <div class="command-box">
+                            <button class="copy-btn" onclick="copyCommand('git-clone')">Copy</button>
+                            <code id="git-clone">git clone https://github.com/yourusername/llm-session-manager.git && cd llm-session-manager</code>
+                        </div>
+                    </li>
+                    <li>
+                        <strong>Start everything:</strong>
+                        <div class="command-box">
+                            <button class="copy-btn" onclick="copyCommand('docker-up')">Copy</button>
+                            <code id="docker-up">docker-compose up -d</code>
+                        </div>
+                    </li>
+                    <li>
+                        <strong>Open in browser:</strong>
+                        <div class="command-box">
+                            <button class="copy-btn" onclick="copyCommand('open-browser')">Copy</button>
+                            <code id="open-browser">open http://localhost:3000</code>
+                        </div>
+                    </li>
+                </ol>
+
+                <div class="alert success">
+                    <strong>✅ What you get:</strong> Backend + Frontend + Database all running in containers!
+                </div>
+            </div>
+        </div>
+
+        <!-- MANUAL METHOD -->
+        <div id="manual" class="tab-content">
+            <div class="install-section">
+                <h2>🛠️ Manual Installation</h2>
+
+                <ol class="steps">
+                    <li>
+                        <strong>Install prerequisites:</strong>
+                        <ul style="margin-left: 20px; margin-top: 5px;">
+                            <li>Python 3.10+</li>
+                            <li>Poetry (Python package manager)</li>
+                            <li>Node.js 18+ (for collaboration features)</li>
+                        </ul>
+                    </li>
+                    <li>
+                        <strong>Clone repository:</strong>
+                        <div class="command-box">
+                            <button class="copy-btn" onclick="copyCommand('manual-clone')">Copy</button>
+                            <code id="manual-clone">git clone https://github.com/yourusername/llm-session-manager.git<br>cd llm-session-manager</code>
+                        </div>
+                    </li>
+                    <li>
+                        <strong>Install dependencies:</strong>
+                        <div class="command-box">
+                            <button class="copy-btn" onclick="copyCommand('poetry-install')">Copy</button>
+                            <code id="poetry-install">poetry install</code>
+                        </div>
+                    </li>
+                    <li>
+                        <strong>Initialize setup:</strong>
+                        <div class="command-box">
+                            <button class="copy-btn" onclick="copyCommand('init-setup')">Copy</button>
+                            <code id="init-setup">poetry run python -m llm_session_manager.cli init</code>
+                        </div>
+                    </li>
+                    <li>
+                        <strong>Start monitoring:</strong>
+                        <div class="command-box">
+                            <button class="copy-btn" onclick="copyCommand('start-monitor')">Copy</button>
+                            <code id="start-monitor">poetry run python -m llm_session_manager.cli monitor</code>
+                        </div>
+                    </li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- DEMO METHOD -->
+        <div id="demo" class="tab-content">
+            <div class="install-section">
+                <h2>🎯 Try the Demo (No Install)</h2>
+
+                <div class="alert">
+                    <strong>💡 Want to see it in action first?</strong><br>
+                    Try our hosted demo with pre-loaded sample data:
+                </div>
+
+                <button class="cta-button demo-button" onclick="openDemo()">
+                    🌐 Open Live Demo
+                </button>
+
+                <div style="margin-top: 20px;">
+                    <strong>Or try GitHub Codespaces:</strong>
+                    <p style="margin-top: 10px; color: #666;">Click the button below to launch a fully configured development environment in your browser:</p>
+                    <button class="cta-button" onclick="openCodespaces()">
+                        Open in GitHub Codespaces
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- FEATURES -->
+        <div class="install-section" style="margin-top: 30px;">
+            <h2>✨ What You'll Get</h2>
+            <div class="feature-grid">
+                <div class="feature">
+                    <div class="feature-icon">🔍</div>
+                    <strong>Auto-Discovery</strong>
+                    <p style="font-size: 13px; color: #666; margin-top: 5px;">Finds Claude Code, Cursor, Copilot sessions</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">📊</div>
+                    <strong>Token Tracking</strong>
+                    <p style="font-size: 13px; color: #666; margin-top: 5px;">Real-time precise token counting</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">👥</div>
+                    <strong>Team Collaboration</strong>
+                    <p style="font-size: 13px; color: #666; margin-top: 5px;">Live chat, presence, cursor tracking</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🧠</div>
+                    <strong>AI Insights</strong>
+                    <p style="font-size: 13px; color: #666; margin-top: 5px;">Smart recommendations from Cognee</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- NEXT STEPS -->
+        <div class="install-section" style="background: #667eea; color: white;">
+            <h2 style="color: white;">🎓 After Installation</h2>
+            <ul style="margin-left: 20px; line-height: 1.8;">
+                <li>Run <code style="background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 3px;">llm-session list</code> to see active sessions</li>
+                <li>Run <code style="background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 3px;">llm-session monitor</code> for real-time dashboard</li>
+                <li>Run <code style="background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 3px;">llm-session insights &lt;id&gt;</code> for AI recommendations</li>
+                <li>Check README.md for full documentation</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function copyCommand(id) {
+            const element = document.getElementById(id);
+            const text = element.textContent;
+
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = element.parentElement.querySelector('.copy-btn');
+                const originalText = btn.textContent;
+                btn.textContent = 'Copied!';
+                btn.classList.add('copied');
+
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.classList.remove('copied');
+                }, 2000);
+            });
+        }
+
+        function openDemo() {
+            window.open('https://demo.llmsessionmanager.com', '_blank');
+        }
+
+        function openCodespaces() {
+            window.open('https://github.com/yourusername/llm-session-manager/codespaces', '_blank');
+        }
+    </script>
+</body>
+</html>

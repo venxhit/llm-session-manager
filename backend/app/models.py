@@ -154,7 +154,7 @@ class TeamMetric(Base):
     # Metric data
     metric_type = Column(String, nullable=False)  # token_usage, session_count, etc.
     value = Column(Float, nullable=False)
-    metadata = Column(JSON, default=dict)
+    metric_metadata = Column(JSON, default=dict)
 
     # Timestamp
     timestamp = Column(DateTime, nullable=False, default=datetime.utcnow)
@@ -231,7 +231,7 @@ class SessionMessage(Base):
 
     # Content
     content = Column(Text, nullable=False)
-    metadata = Column(JSON, default=dict)  # {mentions: [], reactions: {}, code_ref: {...}}
+    message_metadata = Column(JSON, default=dict)  # {mentions: [], reactions: {}, code_ref: {...}}
 
     # Threading
     parent_id = Column(String, ForeignKey("session_messages.id", ondelete="CASCADE"))

@@ -76,3 +76,24 @@ TESTING_SUMMARY.md
 WHATS_NEW_*.md
 *_NOTES.md
 *_SUMMARY.md
+
+# Test outputs
+test_output.txt
+test_pre_launch.txt
+test_results_cli.json
+
+# Environment files (keep local, contains secrets)
+backend/.env
+backend/test_tokens.txt
+backend/generate_tokens.py
+
+# Data files (user-specific)
+data/
+data/memories/
+data/sessions.db
+
+# VS Code extension (work in progress)
+vscode-extension/
+
+# Temporary build/test files
+curl
