@@ -97,3 +97,25 @@ vscode-extension/
 
 # Temporary build/test files
 curl
+
+# Internal documentation (not for public repo)
+.claude/
+*_LAUNCH_PLAN.md
+*LAUNCH_PLAN.md
+*_CHECKLIST.md
+*CHECKLIST.md
+*_TESTING*.md
+TESTING_*.md
+*TEST_REPORT.md
+*_ANALYSIS.md
+COMMERCIAL_*.md
+PRODUCT_HUNT_POST.md
+SOCIAL_MEDIA_TEMPLATES.md
+SCREENSHOT_CHECKLIST.md
+*_PREP_*.md
+*_READY.md
+ONBOARDING_IMPROVEMENTS.md
+SKILLS_AND_VSCODE_SETUP.md
+GITHUB_PUSH_PLAN.md
+REPO_CLEANUP_PLAN.md
+PUSH_COMPLETE.md
