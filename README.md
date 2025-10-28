@@ -181,6 +181,9 @@ git clone https://github.com/yourusername/llm-session-manager.git
 cd llm-session-manager
 poetry install
 
+# If upgrading from an older version, run database migration
+python3 migrate_database.py
+
 # Optional: Enable AI insights
 export LLM_API_KEY="your-openai-or-anthropic-key"
 
