@@ -696,7 +696,7 @@ def auto_tag(
         llm-session auto-tag abc123 --apply        # Auto-apply tags
     """
     try:
-        from ..utils.ai_tagger import AITagger
+        from llm_session_manager.utils.ai_tagger import AITagger
 
         # Initialize components
         db, discovery, health_monitor, token_estimator = get_components()
@@ -827,7 +827,7 @@ def describe(
         llm-session describe abc123 --show                      # View current
     """
     try:
-        from ..utils.description_generator import DescriptionGenerator
+        from llm_session_manager.utils.description_generator import DescriptionGenerator
 
         # Initialize components
         db, discovery, health_monitor, token_estimator = get_components()
