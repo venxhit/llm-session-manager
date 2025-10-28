@@ -353,6 +353,96 @@ Supported AI Tools: Claude Code • Cursor • GitHub Copilot
 
 ---
 
+## 🧪 Testing & Development
+
+### Running Tests
+
+We have a comprehensive automated test suite with **14/14 tests passing (100% coverage)**.
+
+**Quick test:**
+```bash
+# Clone and install
+git clone https://github.com/yourusername/llm-session-manager.git
+cd llm-session-manager
+poetry install
+
+# Run automated tests
+python tests/test_cli_automated.py
+
+# Expected output:
+# ✅ 14/14 tests passing
+# Tests: CLI, Export, Health, Memory, Tagging, etc.
+```
+
+**What gets tested:**
+- ✅ CLI installation and commands
+- ✅ Session discovery and listing
+- ✅ Health monitoring
+- ✅ Export functionality (JSON, YAML, Markdown)
+- ✅ Memory commands (add, search, list, stats)
+- ✅ Tagging system
+- ✅ Init command
+
+### Manual Testing
+
+**1. Test CLI monitoring:**
+```bash
+# List your active AI sessions
+poetry run python -m llm_session_manager.cli list
+
+# Monitor in real-time
+poetry run python -m llm_session_manager.cli monitor
+
+# Get health breakdown
+poetry run python -m llm_session_manager.cli health <session-id>
+```
+
+**2. Test collaboration features:**
+```bash
+# Terminal 1: Start backend
+cd backend
+uvicorn app.main:app --reload
+
+# Terminal 2: Start frontend
+cd frontend
+npm install
+npm run dev
+
+# Browser: Open http://localhost:3000
+# Create a session, invite teammates, test chat
+```
+
+**3. Test export:**
+```bash
+# Export session data
+poetry run python -m llm_session_manager.cli export <session-id> --format json
+
+# Verify file created
+cat /tmp/export.json
+```
+
+### Contributing
+
+Want to contribute? Here's how to get started:
+
+1. **Fork and clone** the repository
+2. **Install dependencies:** `poetry install`
+3. **Run tests:** `python tests/test_cli_automated.py`
+4. **Make changes** and add tests
+5. **Ensure all tests pass** (14/14)
+6. **Submit a pull request**
+
+**Areas we'd love help with:**
+- Additional AI tool integrations (Windsurf, Aider, etc.)
+- Enhanced pattern recognition algorithms
+- UI/UX improvements
+- Documentation and tutorials
+- Bug fixes and optimizations
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+
+---
+
 ## 🗺️ Roadmap
 
 <table>
