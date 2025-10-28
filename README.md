@@ -390,12 +390,19 @@ python tests/test_cli_automated.py
 # List your active AI sessions
 poetry run python -m llm_session_manager.cli list
 
-# Monitor in real-time
+# Monitor in real-time (dashboard view)
 poetry run python -m llm_session_manager.cli monitor
+# Press Ctrl+C to exit the monitor
 
-# Get health breakdown
+# Get detailed health breakdown for a specific session
 poetry run python -m llm_session_manager.cli health <session-id>
+
+# Example with actual session ID:
+poetry run python -m llm_session_manager.cli health claude_code_60420
 ```
+
+**Note:** The `monitor` command shows a live-updating dashboard. To exit, press `Ctrl+C`.
+If keyboard shortcuts aren't working, use `Ctrl+C` to quit.
 
 **2. Test collaboration features:**
 ```bash
