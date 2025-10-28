@@ -60,6 +60,36 @@ def get_components():
     return db, discovery, health_monitor, token_estimator
 
 
+def find_session(session_id: str, db: Database, discovery: SessionDiscovery) -> Optional[Session]:
+    """Find a session by ID in database or active sessions.
+
+    Args:
+        session_id: Full or partial session ID
+        db: Database instance
+        discovery: SessionDiscovery instance
+
+    Returns:
+        Session object if found, None otherwise
+    """
+    # First check database
+    session = db.get_session(session_id)
+    if session:
+        return session
+
+    # If not found, search in active sessions
+    sessions = discovery.discover_sessions()
+    for s in sessions:
+        if s.id == session_id or s.id.startswith(session_id):
+            # Save to database for future use
+            try:
+                db.add_session(s)
+            except Exception:
+                pass
+            return s
+
+    return None
+
+
 @app.command()
 def monitor(
     refresh_interval: int = typer.Option(5, "--interval", "-i", help="Refresh interval in seconds")
@@ -133,6 +163,17 @@ def list(
         token_estimator.update_token_counts(sessions)
         health_monitor.update_health_scores(sessions)
 
+        # Save/update sessions in database
+        for session in sessions:
+            try:
+                db.add_session(session)
+            except Exception:
+                # Session might already exist, try updating instead
+                try:
+                    db.update_session(session)
+                except Exception:
+                    pass  # Ignore errors for now
+
         # Filter by status if specified
         if status:
             sessions = [s for s in sessions if s.status.value == status.lower()]
@@ -167,7 +208,7 @@ def list(
                 header_style="bold cyan"
             )
 
-            table.add_column("ID", style="dim", width=20)
+            table.add_column("ID", style="dim", width=35)
             table.add_column("Type", style="cyan")
             table.add_column("PID", justify="right")
             table.add_column("Status", justify="center")
@@ -204,7 +245,7 @@ def list(
                 tags_str = " ".join(tags_display) if tags_display else "-"
 
                 table.add_row(
-                    session.id[:18] + "..." if len(session.id) > 20 else session.id,
+                    session.id,
                     session.type.value,
                     str(session.pid),
                     f"[{status_color}]{session.status.value}[/{status_color}]",
@@ -219,6 +260,91 @@ def list(
     except Exception as e:
         console.print(f"[red]Error listing sessions: {e}[/red]")
         logger.error("list_sessions_failed", error=str(e))
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def show(
+    session_id: str = typer.Argument(..., help="Session ID to show details for")
+):
+    """Show detailed information about a specific session.
+
+    Displays comprehensive session information including:
+    - Session ID, type, and status
+    - Process information (PID, working directory)
+    - Token usage and limits
+    - Health score and analysis
+    - Tags and project
+    - Description
+    - Conversation statistics
+    """
+    try:
+        # Initialize components
+        db, discovery, health_monitor, token_estimator = get_components()
+
+        # Try to find session in database
+        console.print(f"[dim]Searching for session: {session_id}...[/dim]")
+        session = db.get_session(session_id)
+
+        if not session:
+            console.print(f"[yellow]Session '{session_id}' not found in database.[/yellow]")
+            console.print("[dim]Note: Sessions are saved when you run 'list' command.[/dim]")
+            return
+
+        # Display session details
+        from rich.panel import Panel
+        from datetime import datetime
+
+        # Calculate duration
+        duration = datetime.now() - session.start_time
+        hours = int(duration.total_seconds() // 3600)
+        minutes = int((duration.total_seconds() % 3600) // 60)
+        duration_str = f"{hours}h {minutes}m"
+
+        # Token percentage
+        token_pct = (session.token_count / session.token_limit * 100) if session.token_limit > 0 else 0
+
+        # Health emoji
+        health_score = session.health_score / 100
+        emoji = "✅" if health_score >= 0.7 else "⚠️" if health_score >= 0.4 else "🔴"
+
+        # Build details text
+        details = f"""[bold]Session ID:[/bold] {session.id}
+[bold]Type:[/bold] {session.type.value}
+[bold]Status:[/bold] {session.status.value}
+[bold]PID:[/bold] {session.pid}
+
+[bold cyan]Timing:[/bold cyan]
+  Started: {session.start_time.strftime('%Y-%m-%d %H:%M:%S')}
+  Duration: {duration_str}
+  Last Activity: {session.last_activity.strftime('%Y-%m-%d %H:%M:%S')}
+
+[bold cyan]Token Usage:[/bold cyan]
+  Count: {session.token_count:,} / {session.token_limit:,}
+  Usage: {token_pct:.1f}%
+
+[bold cyan]Health:[/bold cyan]
+  Score: {emoji} {session.health_score:.0f}/100
+
+[bold cyan]Statistics:[/bold cyan]
+  Messages: {session.message_count}
+  Files: {session.file_count}
+  Errors: {session.error_count}
+
+[bold cyan]Organization:[/bold cyan]
+  Project: {session.project_name or '(not set)'}
+  Tags: {', '.join(f'#{t}' for t in session.tags) if session.tags else '(no tags)'}
+  Description: {session.description or '(no description)'}
+
+[bold cyan]Location:[/bold cyan]
+  {session.working_directory}
+"""
+
+        console.print(Panel(details, title=f"📊 Session Details", border_style="cyan"))
+
+    except Exception as e:
+        console.print(f"[red]Error showing session details: {e}[/red]")
+        logger.error("show_session_failed", error=str(e))
         raise typer.Exit(code=1)
 
 
@@ -246,19 +372,13 @@ def export(
         # Initialize components
         db, discovery, health_monitor, token_estimator = get_components()
 
-        # Discover sessions
+        # Find session
         console.print(f"[dim]Searching for session: {session_id}...[/dim]")
-        sessions = discovery.discover_sessions()
-
-        # Find matching session
-        session = None
-        for s in sessions:
-            if s.id == session_id or s.id.startswith(session_id):
-                session = s
-                break
+        session = find_session(session_id, db, discovery)
 
         if not session:
             console.print(f"[red]Session '{session_id}' not found.[/red]")
+            console.print("[dim]Tip: Run 'list' command first to discover active sessions.[/dim]")
             raise typer.Exit(code=1)
 
         # Update metrics
@@ -451,19 +571,13 @@ def health(
         # Initialize components
         db, discovery, health_monitor, token_estimator = get_components()
 
-        # Discover sessions
+        # Find session
         console.print(f"[dim]Searching for session: {session_id}...[/dim]")
-        sessions = discovery.discover_sessions()
-
-        # Find matching session
-        session = None
-        for s in sessions:
-            if s.id == session_id or s.id.startswith(session_id):
-                session = s
-                break
+        session = find_session(session_id, db, discovery)
 
         if not session:
             console.print(f"[red]Session '{session_id}' not found.[/red]")
+            console.print("[dim]Tip: Run 'list' command first to discover active sessions.[/dim]")
             raise typer.Exit(code=1)
 
         # Update metrics
@@ -557,19 +671,13 @@ def tag(
         # Initialize components
         db, discovery, health_monitor, token_estimator = get_components()
 
-        # Discover sessions
+        # Find session
         console.print(f"[dim]Searching for session: {session_id}...[/dim]")
-        sessions = discovery.discover_sessions()
-
-        # Find matching session
-        session = None
-        for s in sessions:
-            if s.id == session_id or s.id.startswith(session_id):
-                session = s
-                break
+        session = find_session(session_id, db, discovery)
 
         if not session:
             console.print(f"[red]Session '{session_id}' not found.[/red]")
+            console.print("[dim]Tip: Run 'list' command first to discover active sessions.[/dim]")
             raise typer.Exit(code=1)
 
         # Add tags
@@ -602,19 +710,13 @@ def untag(
         # Initialize components
         db, discovery, health_monitor, token_estimator = get_components()
 
-        # Discover sessions
+        # Find session
         console.print(f"[dim]Searching for session: {session_id}...[/dim]")
-        sessions = discovery.discover_sessions()
-
-        # Find matching session
-        session = None
-        for s in sessions:
-            if s.id == session_id or s.id.startswith(session_id):
-                session = s
-                break
+        session = find_session(session_id, db, discovery)
 
         if not session:
             console.print(f"[red]Session '{session_id}' not found.[/red]")
+            console.print("[dim]Tip: Run 'list' command first to discover active sessions.[/dim]")
             raise typer.Exit(code=1)
 
         # Remove tags
@@ -647,19 +749,13 @@ def set_project(
         # Initialize components
         db, discovery, health_monitor, token_estimator = get_components()
 
-        # Discover sessions
+        # Find session
         console.print(f"[dim]Searching for session: {session_id}...[/dim]")
-        sessions = discovery.discover_sessions()
-
-        # Find matching session
-        session = None
-        for s in sessions:
-            if s.id == session_id or s.id.startswith(session_id):
-                session = s
-                break
+        session = find_session(session_id, db, discovery)
 
         if not session:
             console.print(f"[red]Session '{session_id}' not found.[/red]")
+            console.print("[dim]Tip: Run 'list' command first to discover active sessions.[/dim]")
             raise typer.Exit(code=1)
 
         # Set project
@@ -702,19 +798,13 @@ def auto_tag(
         db, discovery, health_monitor, token_estimator = get_components()
         auto_tagger = AutoTagger()
 
-        # Discover sessions
+        # Find session
         console.print(f"[dim]Searching for session: {session_id}...[/dim]")
-        sessions = discovery.discover_sessions()
-
-        # Find matching session
-        session = None
-        for s in sessions:
-            if s.id == session_id or s.id.startswith(session_id):
-                session = s
-                break
+        session = find_session(session_id, db, discovery)
 
         if not session:
             console.print(f"[red]Session '{session_id}' not found.[/red]")
+            console.print("[dim]Tip: Run 'list' command first to discover active sessions.[/dim]")
             raise typer.Exit(code=1)
 
         # Choose tagging method
@@ -832,19 +922,13 @@ def describe(
         # Initialize components
         db, discovery, health_monitor, token_estimator = get_components()
 
-        # Discover sessions
+        # Find session
         console.print(f"[dim]Searching for session: {session_id}...[/dim]")
-        sessions = discovery.discover_sessions()
-
-        # Find matching session
-        session = None
-        for s in sessions:
-            if s.id == session_id or s.id.startswith(session_id):
-                session = s
-                break
+        session = find_session(session_id, db, discovery)
 
         if not session:
             console.print(f"[red]Session '{session_id}' not found.[/red]")
+            console.print("[dim]Tip: Run 'list' command first to discover active sessions.[/dim]")
             raise typer.Exit(code=1)
 
         # Show current description

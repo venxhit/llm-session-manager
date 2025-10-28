@@ -444,8 +444,8 @@ class Database:
             file_count=row["file_count"],
             error_count=row["error_count"],
             tags=tags,
-            project_name=row.get("project_name"),
-            description=row.get("description"),
+            project_name=row["project_name"] if "project_name" in row.keys() else None,
+            description=row["description"] if "description" in row.keys() else None,
         )
 
     def _row_to_memory(self, row: sqlite3.Row) -> Memory:
